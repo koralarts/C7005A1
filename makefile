@@ -10,12 +10,16 @@ ODIR = ./object
 BDIR = ./bin
 
 # client
-client: client.o network.o
+client: network.o client.o
 	$(GCC) $(FLAGS) -o $(BDIR)/client $(ODIR)/client.o $(ODIR)/network.o
 
 # server
-server: server.o network.o
+server: network.o server.o
 	$(GCC) $(FLAGS) -o $(BDIR)/server $(ODIR)/server.o $(ODIR)/network.o
+
+# mkDir
+dir:
+	mkdir -p $(BDIR) && mkdir -p $(ODIR)
 
 # Clean
 clean:

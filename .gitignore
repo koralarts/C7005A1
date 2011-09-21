@@ -1,5 +1,6 @@
 # Directories
 bin/*
+object/*
 
 # Compiled Object files
 *.slo
