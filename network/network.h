@@ -1,6 +1,8 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
+#define DEF_PORT 7001
+
 // Function Prototypes
 #ifdef __cplusplus
 extern "C" {
