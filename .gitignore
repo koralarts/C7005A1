@@ -1,6 +1,5 @@
 # Directories
-bin/
-object/
+bin/*
 
 # Compiled Object files
 *.slo
