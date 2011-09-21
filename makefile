@@ -26,11 +26,11 @@ clean:
 	rm -f $(BDIR)/* $(ODIR)/*
 
 # Object
-network.o: $(NDIR)/network.c
+network.o: dir
 	$(GCC) $(FLAGS) -o $(ODIR)/network.o -c $(NDIR)/network.c
 
-client.o: $(CDIR)/client.c
+client.o:
 	$(GCC) $(FLAGS) -o $(ODIR)/client.o -c $(CDIR)/client.c
 
-server.o: $(SDIR)/server.c
+server.o:
 	$(GCC) $(FLAGS) -o $(ODIR)/server.o -c $(SDIR)/server.c
