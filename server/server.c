@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "server.h"
 #include "../network/network.h"
 
