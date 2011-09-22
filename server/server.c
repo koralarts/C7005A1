@@ -35,7 +35,8 @@ void server(int port)
 --
 -- DATE: March 12, 2011
 --
--- REVISIONS: September 22, 2011 - Added some extra comments about failure
+-- REVISIONS: September 22, 2011 - Added some extra comments about failure and
+-- a function call to set the socket into non blocking mode.
 --
 -- DESIGNER: Luke Queenan
 --
@@ -71,6 +72,7 @@ void initializeServer(int *listenSocket, int *port)
         systemFatal("Cannot Bind Address To Socket");
     }
     
+    // Make the socket non blocking
     if (makeSocketNonBlocking(&(*listenSocket)) == -1)
     {
         systemFatal("Cannot Set Socket To Non Blocking");
