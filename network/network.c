@@ -35,6 +35,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <string.h>
 
 #include "network.h"
@@ -312,6 +313,44 @@ int connectToServer(int *port, int *socket, const char *ip)
     bcopy(hp->h_addr, (char *)&address.sin_addr, hp->h_length);
 
     return connect(*socket, (struct sockaddr *)&address, sizeof(address));
+}
+
+/*
+-- FUNCTION: makeSocketNonBlocking
+--
+-- DATE: September 22, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- INTERFACE: int makeSocketNonBlocking(int *socket);
+--
+-- RETURNS: the result of the fcntl function
+--
+-- NOTES:
+-- This is the wrapper function for setting the non blocking flag on the socket
+-- desriptor.
+*/
+int makeSocketNonBlocking(int *socket)
+{
+    int flags = 0;
+    
+    // Get the current flags off the socket
+    flags = fcntl(*socket, F_GETFL, 0);
+    
+    // Make sure we did not encounter an error
+    if (flags == -1)
+    {
+        return -1;
+    }
+    
+    // Set the flags to non blocking
+    flags |= O_NONBLOCK;
+    
+    return fcntl(*socket, F_SETFL, flags);
 }
 
 
