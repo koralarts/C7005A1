@@ -27,7 +27,10 @@ static void systemFatal(const char* message);
 
 void server(int port)
 {
-    printf("Server started with port %d\n", port);
+    int listenSocket = 0;
+    
+    // Set up the server
+    initializeServer(&listenSocket, &port);
 }
 
 /*
