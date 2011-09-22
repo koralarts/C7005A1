@@ -31,6 +31,8 @@ void server(int port)
     
     // Set up the server
     initializeServer(&listenSocket, &port);
+    
+    printf("Server Closing!\n");
 }
 
 /*
