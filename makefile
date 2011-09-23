@@ -14,8 +14,8 @@ client: network.o client.o
 	$(GCC) $(FLAGS) -o $(BDIR)/client $(ODIR)/client.o $(ODIR)/network.o
 
 # server
-server: network.o server.o
-	$(GCC) $(FLAGS) -o $(BDIR)/server $(ODIR)/server.o $(ODIR)/network.o
+server: network.o server.o main.o
+	$(GCC) $(FLAGS) -o $(BDIR)/server $(ODIR)/server.o $(ODIR)/main.o $(ODIR)/network.o
 
 # mkDir
 dir:
@@ -34,3 +34,7 @@ client.o:
 
 server.o:
 	$(GCC) $(FLAGS) -o $(ODIR)/server.o -c $(SDIR)/server.c
+	
+main.o:
+	$(GCC) $(FLAGS) -o $(ODIR)/main.o -c $(SDIR)/main.c
+

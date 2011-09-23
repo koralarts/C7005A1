@@ -17,6 +17,7 @@ int readData(int *socket, char *buffer, int bytesToRead);
 int sendData(int *socket, const char *buffer, int bytesToSend);
 int closeSocket(int *socket);
 int connectToServer(int *port, int *socket, const char *ip);
+int makeSocketNonBlocking(int *socket);
 #ifdef __cplusplus
 }
 #endif
