@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/epoll.h>
 #include <stdlib.h>
+
 #include "server.h"
 #include "../network/network.h"
 
@@ -28,9 +30,24 @@ static void systemFatal(const char* message);
 void server(int port)
 {
     int listenSocket = 0;
+    int epollServer = 0;
+    struct epoll_event event;
+    struct epoll_event *events;
     
     // Set up the server
     initializeServer(&listenSocket, &port);
+    
+    // Create the epoll server
+    epollServer = epoll_create1(0);
+    
+    if (epollServer == -1)
+    {
+        systemFatal("Unable To Create Epoll Server");
+    }
+    
+    event.data.fd = listenSocket;
+    event.events = EPOLLIN | EPOLLET;
+    
     
     printf("Server Closing!\n");
 }
