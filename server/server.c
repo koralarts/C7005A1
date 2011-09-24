@@ -6,6 +6,8 @@
 #include "server.h"
 #include "../network/network.h"
 
+#define MAX_EVENTS 64
+
 /* Might not need this
 typedef union epoll_data
 {
@@ -27,7 +29,7 @@ struct epoll_event
 void initializeServer(int *listenSocket, int *port);
 static void systemFatal(const char* message);
 
-void server(int port, size_t maxClients)
+void server(int port)
 {
     int listenSocket = 0;
     int epollServer = 0;
@@ -56,7 +58,13 @@ void server(int port, size_t maxClients)
     }
 
     // Buffer where the events are returned
-    events = calloc(maxClients, sizeof event);
+    events = calloc(MAX_EVENTS, sizeof event);
+    
+    // Loop to monitor the epoll server
+    while (1)
+    {
+        
+    }
     
     printf("Server Closing!\n");
 }
