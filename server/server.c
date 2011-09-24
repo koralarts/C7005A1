@@ -27,7 +27,7 @@ struct epoll_event
 void initializeServer(int *listenSocket, int *port);
 static void systemFatal(const char* message);
 
-void server(int port)
+void server(int port, size_t maxClients)
 {
     int listenSocket = 0;
     int epollServer = 0;
@@ -44,10 +44,19 @@ void server(int port)
     {
         systemFatal("Unable To Create Epoll Server");
     }
-    
+
+    // Set up the event
     event.data.fd = listenSocket;
     event.events = EPOLLIN | EPOLLET;
-    
+
+    // Attach the event to the epoll server, along with the socket
+    if (epoll_ctl(epollServer, EPOLL_CTL_ADD, listenSocket, &event) == -1)
+    {
+        systemFatal("Unable To Set Up Epoll Server With Socket");
+    }
+
+    // Buffer where the events are returned
+    events = calloc(maxClients, sizeof event);
     
     printf("Server Closing!\n");
 }

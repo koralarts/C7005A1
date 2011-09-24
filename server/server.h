@@ -7,7 +7,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-void server (int port);
+void server (int port, size_t maxClients);
 #ifdef __cplusplus
 }
 #endif
