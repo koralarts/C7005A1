@@ -10,24 +10,6 @@
 
 #define MAX_EVENTS 64
 
-/* Might not need this
-typedef union epoll_data
-{
-    void *ptr;
-    int fd;
-    _uint32_t u32;
-    _unit64_t u64;
-} epoll_data_t;
-
-struct epoll_event
-{
-    // Epoll events
-    _uint32_t events;
-    // User data
-    epoll_data_t data;
-};
-*/
-
 void initializeServer(int *listenSocket, int *port);
 static void systemFatal(const char* message);
 
@@ -69,7 +51,7 @@ void server(int port)
     while (1)
     {
         // Wait indefinitely for an event (connection) to occur
-        numberOfReadyEvents = epoll_wait(listenSocket, events, MAX_EVENTS, -1);
+        numberOfReadyEvents = epoll_wait(epollServer, events, MAX_EVENTS, -1);
         
         // If we get here, we have some events, so iterate through the events
         for (count = 0; count < numberOfReadyEvents; count++)
