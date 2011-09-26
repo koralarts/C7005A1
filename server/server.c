@@ -110,6 +110,17 @@ void server(int port)
     printf("Server Closing!\n");
 }
 
+void processConnection()
+{
+    int done = 0;
+    
+    // Read data from the client
+    while (1)
+    {
+        
+    }
+}
+
 /*
 -- FUNCTION: initializeServer
 --

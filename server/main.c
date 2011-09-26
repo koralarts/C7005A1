@@ -4,7 +4,7 @@
 
 #include "server.h"
 
-#define DEFAULT_PORT 8929
+#define DEFAULT_PORT 7001
 
 int main(int argc, char **argv);
 
