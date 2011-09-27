@@ -10,8 +10,10 @@
 
 #define MAX_EVENTS 64
 #define BUFFER_LENGTH 512
+#define PORT_RANGE 10000
 
 void initializeServer(int *listenSocket, int *port);
+int getFreePort(char *buffer, int startingPort);
 static void systemFatal(const char* message);
 
 void server(int port)
@@ -21,6 +23,7 @@ void server(int port)
     int epollServer = 0;
     int numberOfReadyEvents = 0;
     int count = 0;
+    char *ports = (char*)calloc(PORT_RANGE, sizeof(char));
     struct epoll_event event;
     struct epoll_event *events;
     
@@ -70,6 +73,7 @@ void server(int port)
                 // We have a connection waiting on the listening socket
                 while (1)
                 {
+                    /*
                     if ((socket = acceptConnection(&listenSocket)) == -1)
                     {
                         if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
@@ -84,6 +88,13 @@ void server(int port)
                             break;
                         }
                     }
+                    */
+                    // TODO: FORK HERE?
+                    
+                    // Create a mini server to deal with the client
+                    socket = getFreePort(&(*ports), port);
+                    initializeServer(&socket, socket);
+                    
                     // Make the socket non blocking
                     if (makeSocketNonBlocking(&socket) == -1)
                     {
@@ -98,6 +109,8 @@ void server(int port)
                     {
                         systemFatal("Unable To Add Socket To Epoll Server");
                     }
+                    
+                    // Send a new port to the client
                 }
                 continue;
             }
@@ -111,11 +124,30 @@ void server(int port)
     printf("Server Closing!\n");
 }
 
+int getFreePort(char *buffer, int startingPort)
+{
+    int count = 0;
+    for (count = 0; count < PORT_RANGE; count++)
+    {
+        if (buffer[count] == 0)
+        {
+            buffer[count] = 1;
+            return startingPort + count;
+        }
+    }
+    return -1;
+}
+
+void setFreePort(char *buffer, int startingPort, int port)
+{
+    buffer[port - startingPort] = 0;
+}
+
 void processConnection(int socket)
 {
     int done = 0;
     int bytesRead = 0;
-    char *buffer = (char*)malloc(sizeof(char)* BUFFER_LENGTH);
+    char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
     
     // Read data from the client
     while (1)
