@@ -1,6 +1,7 @@
 # Directories
 bin/*
 object/*
+debug/*
 
 # Compiled Object files
 *.slo

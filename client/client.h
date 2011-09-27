@@ -9,14 +9,16 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-int processParent(int* socket, const char* ipAddr);
-void processChild(int* socket, const char* ip, const int port);
+int processParent(const char* ipAddr);
+void processChild(const char* ip, int port);
 void listFile(int* socket);
 void receiveFile(int* socket, const char* fileName);
 void sendFile(int* socket, const char* fileName);
 
 // Helper functions
+int initConnection(int port, const char* ip);
 void printHelp();
+static void systemFatal(const char* message);
 #ifdef __cplusplus
 }
 #endif

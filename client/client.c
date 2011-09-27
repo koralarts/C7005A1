@@ -1,76 +1,99 @@
 #include "client.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <errno.h>
+#include <unistd.h>
 #include <string.h>
 
-int main(int argv, char* argc[])
+#define USAGE		"Usage: %s -i [ip address]\n"
+
+int main(int argc, char** argv)
 {
-	int socket;
-	int port;
-	char* ipAddr;
+	char* ipAddr = 0;
+	int port = 0;
+	int option = 0;
 
-	if(argv < 2) {
-		perror("Not enough arguments. Usage: client [[ip address]]\n");
-		return 1;
-	} else {
-		ipAddr = argc[1];
+	if(argc < 2) {
+		fprintf(stderr, "Not Enough Arguments\n");
+		fprintf(stderr, USAGE, argv[0]);
+        exit(EXIT_FAILURE);
 	}
 
-	if((socket = tcpSocket()) == -1) {
-		perror("Cannot create socket\n");
-		return 1;
-	}
+	while((option = getopt(argc, argv, ":i:")) != -1)
+    {
+        switch(option)
+        {
+        case 'i':
+            ipAddr = optarg;
+            break;
+        default:
+            fprintf(stderr, USAGE, argv[0]);
+            exit(EXIT_FAILURE);
+        }
+    }
+    
+    if(ipAddr == 0) {
+    	fprintf(stderr, "-i is a required switch\n");
+    	fprintf(stderr, USAGE, argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
-	if(setReuse(&socket) == -1) {
-		perror("Cannot set reuse\n");
-		return 1;
-	}
-
-	if((port = processParent(&socket, ipAddr)) == 0) {
-		perror("Invalid Port");
-		return 1;
+	// Connecting to server
+	if((port = processParent(ipAddr)) == 0) {
+		systemFatal("Invalid Port\n");
 	}
 	
-	processChild(&socket, ipAddr, port);
+	processChild(ipAddr, port);
 
 	return 0;
 }
 
-int processParent(int* socket, const char* ip) 
+/*
+-- FUNCTION: processParent
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS: September 25, 2011 - removes socke and port as part of the
+--	arguments and moved the creation of the socket inside.
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: int processParent(const char* ip, int port);
+--				ip - ip address of the server
+--				port - the port to connect to
+--
+-- RETURNS: int > 0 - the dynamically created port
+--				== 0 - invalid port
+--
+-- NOTES:
+-- This function sets up the required client connections to connect to the
+-- main server, such as creating a socket, setting the socket to reuse mode,
+-- binding it to an address, and setting it to listen. If an error occurs, the
+-- function calls "systemFatal" with an error message.
+*/
+int processParent(const char* ip) 
 {
+	int socket;
 	char* reply = (char*)malloc(sizeof(char) * MAX_PORT_SIZE);
 	
-	printf("Connecting to server %s...\n", ip);
-	// Connect to server
-	if(connectToServer((int*)DEF_PORT, socket, ip) == -1) {
-		perror("Cannot Connect to server\n");		
-		exit(1);
-	}
-	printf("Connected to server.\n");
+	socket = initConnection(DEF_PORT, ip);
 	
 	// Wait for port respond
-	if(readData(socket, reply, MAX_PORT_SIZE) == -1) {
-		printf("Error reading from socket.\n");
-		exit(1);
+	if(readData(&socket, reply, MAX_PORT_SIZE) == -1) {
+		systemFatal("Error Reading from Socket\n");
 	}
 	
 	// Convert reply to int
 	return atoi(reply);
 }
 
-void processChild(int* socket, const char* ip, int port)
+void processChild(const char* ip, int port)
 {
-	int cmd, space, numRead;
+	int socket, cmd, space, numRead;
 	char fileName[FILENAME_MAX];
 	
-	printf("Connecting to transfer server...\n");
-	// Connect to transfer server
-	if(connectToServer(&port, socket, ip) == -1) {
-		perror("Cannot Connect to server\n");		
-		exit(1);
-	}
-	printf("Connected to transfer server...\n");
+	socket = initConnection(port, ip);
 	
 	// Print help
 	printHelp();
@@ -80,29 +103,28 @@ void processChild(int* socket, const char* ip, int port)
 		printf("Enter command: ");
 		
 		if((numRead = scanf("%d%d%s", &cmd, &space, fileName)) == EOF) { 
-			closeSocket(socket);
-			exit(0);
+			cmd = 'e';
 		}
 		
 		switch(cmd) {
-		case 'x': // exit
-			closeSocket(socket);
-			exit(0);
+		case 'e': // exit
+			closeSocket(&socket);
+			exit(EXIT_SUCCESS);
 		case 'l': // list files
-			listFile(socket);
+			listFile(&socket);
 			break;
 		case 'r': // receive file
 			if(numRead != 3) {
-				perror("Invalid Command. h for help");
+				perror("Invalid Command. h for help\n");
 			} else {
-				receiveFile(socket, fileName);
+				receiveFile(&socket, fileName);
 			}
 			break;
 		case 's': // send file
 			if(numRead != 3) {
-				perror("Invalid Command. h for help");
+				perror("Invalid Command. h for help\n");
 			} else {
-				sendFile(socket, fileName);
+				sendFile(&socket, fileName);
 			}
 			break;
 		case 'h': // show commands
@@ -119,14 +141,12 @@ void listFile(int* socket)
 	
 	// Send Command
 	if(sendData(socket, cmd, sizeof(cmd)) == -1) {
-		perror("Error sending list command");
-		exit(1);
+		systemFatal("Error sending list command\n");
 	}
 	
 	// Receive File List
 	if(readData(socket, files, FILENAME_MAX) == -1) {
-		perror("Error receiving file list");
-		exit(1);
+		systemFatal("Error receiving file list\n");
 	}
 	
 	// Print File List
@@ -137,20 +157,51 @@ void listFile(int* socket)
 void receiveFile(int* socket, const char* fileName)
 {
 	char cmd[2] = "r";
-	char file[FILENAME_MAX];
+	FILE* file;
 	
 	// Send Command
 	if(sendData(socket, cmd, sizeof(cmd)) == -1) {
-		perror("Error sending receive command");
-		exit(1);
+		systemFatal("Error sending receive command\n");
 	}
 	
 	// Send file name to receive
-	//if(
+	if(sendData(socket, fileName, FILENAME_MAX) == -1) {
+		systemFatal("Error sending receive filename\n");
+	}
+	
+	if((file = fopen(fileName, "w")) == NULL) {
+		fprintf(stderr, "Error opening file: %s\n", fileName);
+		return;
+	}
+	
+	while(TRUE) {
+		
+	}
 	
 }
 
 void sendFile(int* socket, const char* fileName){}
+
+int initConnection(int port, const char* ip) 
+{
+	int socket;
+	// Creating Socket
+	if((socket = tcpSocket()) == -1) {
+		systemFatal("Error Creating Socket\n");
+	}
+
+	// Setting Socket to Reuse
+	if(setReuse(&socket) == -1) {
+		systemFatal("Error Set Socket Reuse\n");
+	}
+	
+	// Connect to transfer server
+	if(connectToServer(&port, &socket, ip) == -1) {
+		systemFatal("Cannot Connect to server\n");		
+	}
+	
+	return socket;
+}
 
 void printHelp()
 {
@@ -161,4 +212,28 @@ void printHelp()
 	printf("s [[file name]] - send file\n");
 	printf("h - help\n");
 	printf("e - exit\n");
+}
+
+/*
+-- FUNCTION: systemFatal
+--
+-- DATE: March 12, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Aman Abdulla
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: static void systemFatal(const char* message);
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function displays an error message and shuts down the program.
+*/
+static void systemFatal(const char* message)
+{
+    perror(message);
+    exit(EXIT_FAILURE);
 }
