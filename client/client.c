@@ -12,7 +12,7 @@ int main(int argc, char** argv)
 	int port = 0;
 	int option = 0;
 
-	if(argc < 2) {
+	if(argc != 3) {
 		fprintf(stderr, "Not Enough Arguments\n");
 		fprintf(stderr, USAGE, argv[0]);
         exit(EXIT_FAILURE);
@@ -52,16 +52,17 @@ int main(int argc, char** argv)
 --
 -- DATE: September 23, 2011
 --
--- REVISIONS: September 25, 2011 - removes socke and port as part of the
---	arguments and moved the creation of the socket inside.
+-- REVISIONS: 
+-- September 25, 2011 - removed socket and port as part of the arguments and 
+-- moved the creation of the socket inside.
+-- September 27, 2011 - moved the creation of the socket to a helper function.
 --
 -- DESIGNER: Karl Castillo
 --
 -- PROGRAMMER: Karl Castillo
 --
--- INTERFACE: int processParent(const char* ip, int port);
+-- INTERFACE: int processParent(const char* ip);
 --				ip - ip address of the server
---				port - the port to connect to
 --
 -- RETURNS: int > 0 - the dynamically created port
 --				== 0 - invalid port
@@ -88,6 +89,42 @@ int processParent(const char* ip)
 	return atoi(reply);
 }
 
+/*
+-- FUNCTION: processChild
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS: 
+-- September 25, 2011 - removed socket as part of the arguments and moved the 
+-- creation of the socket inside.
+-- September 27, 2011 - moved the creation of the socket to a helper function
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: void processChild(const char* ip, int port);
+--				ip - ip address of the server
+--				port - the port to connect to
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function sets up the required client connections to connect to the
+-- transfer server, such as creating a socket, setting the socket to reuse mode,
+-- binding it to an address, and setting it to listen. If an error occurs, the
+-- function calls "systemFatal" with an error message.
+--
+-- A menu will be printed with the available commands. Each command will produce
+-- a different effect on the server.
+--
+-- Commands:
+-- e - exit the program
+-- l - list the available files on the server
+-- r - receive a file from the server
+-- s - send a file to the server
+-- h - show a list of available commands
+*/
 void processChild(const char* ip, int port)
 {
 	int socket, cmd, space, numRead;
@@ -100,7 +137,7 @@ void processChild(const char* ip, int port)
 	
 	while(TRUE) {
 		memset(fileName, '\0', FILENAME_MAX);
-		printf("Enter command: ");
+		printf("$ ");
 		
 		if((numRead = scanf("%d%d%s", &cmd, &space, fileName)) == EOF) { 
 			cmd = 'e';
@@ -134,6 +171,29 @@ void processChild(const char* ip, int port)
 	
 }
 
+/*
+-- FUNCTION: listFile
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS:
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: void listFile(int* socket)
+--				socket - the current socket the client is connected as
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function sends the list command and waits for the reply of the transfer
+-- server. The transfer server will reply with the list of files available in
+-- the transfer directory on the server.
+-- 
+-- Once the reply is received, it will be printed in order of receiving.
+*/
 void listFile(int* socket)
 {	
 	char cmd[2] = "l";
@@ -154,6 +214,33 @@ void listFile(int* socket)
 	printf("File List\n%s", files);
 }
 
+
+/*
+-- FUNCTION: receiveFile
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS:
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: void receiveFile(int* socket, const char* fileName)
+--				socket - the current socket the client is connected as
+--				fileName - the name of the file to be received/downloaded
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function sends the receive command and waits for the reply of the 
+-- transfer server. The transfer server will reply with the contents of the
+-- file. If the file is not present, the server will return an error message.
+-- This error message will be printed out.
+--
+-- Once all the contents of the file are received and written to a file, the
+-- program will print out a success message.
+*/
 void receiveFile(int* socket, const char* fileName)
 {
 	char cmd[2] = "r";
@@ -180,6 +267,33 @@ void receiveFile(int* socket, const char* fileName)
 	
 }
 
+
+/*
+-- FUNCTION: sendFile
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS:
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: void sendFile(int* socket, const char* fileName)
+--				socket - the current socket the client is connected as
+--				fileName - the name of the file to be received/downloaded
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function sends the receive command and waits for the reply of the 
+-- transfer server. The transfer server will reply with the contents of the
+-- file. If the file is not present, the server will return an error message.
+-- This error message will be printed out.
+--
+-- Once all the contents of the file are received and written to a file, the
+-- program will print out a success message.
+*/
 void sendFile(int* socket, const char* fileName){}
 
 int initConnection(int port, const char* ip) 
@@ -197,7 +311,7 @@ int initConnection(int port, const char* ip)
 	
 	// Connect to transfer server
 	if(connectToServer(&port, &socket, ip) == -1) {
-		systemFatal("Cannot Connect to server\n");		
+		systemFatal("Cannot Connect to server\n");
 	}
 	
 	return socket;
@@ -237,3 +351,4 @@ static void systemFatal(const char* message)
     perror(message);
     exit(EXIT_FAILURE);
 }
+
