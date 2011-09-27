@@ -9,6 +9,7 @@
 #include "../network/network.h"
 
 #define MAX_EVENTS 64
+#define BUFFER_LENGTH 512
 
 void initializeServer(int *listenSocket, int *port);
 static void systemFatal(const char* message);
@@ -108,6 +109,24 @@ void server(int port)
     }
     
     printf("Server Closing!\n");
+}
+
+void processConnection(int socket)
+{
+    int done = 0;
+    int bytesRead = 0;
+    char *buffer = (char*)malloc(sizeof(char)* BUFFER_LENGTH);
+    
+    // Read data from the client
+    while (1)
+    {
+        bytesRead = readData(&socket, &(*buffer), BUFFER_LENGTH);
+        
+        switch (buffer[0])
+        {
+        
+        }
+    }
 }
 
 /*
