@@ -1,113 +1,56 @@
 #include <stdio.h>
 #include <sys/types.h>
-#include <sys/epoll.h>
+#include <sys/stat.h>
+#include <sys/sendfile.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <dirent.h>
 
 #include "server.h"
 #include "../network/network.h"
 
-#define MAX_EVENTS 64
-#define BUFFER_LENGTH 512
-#define PORT_RANGE 10000
+#define BUFFER_LENGTH 257
+#define GET_FILE 0
+#define SEND_FILE 1
+#define REQUEST_LIST 2
 
 void initializeServer(int *listenSocket, int *port);
-int getFreePort(char *buffer, int startingPort);
+void processConnection(int socket);
+void sendFile(int socket, char *fileName);
 static void systemFatal(const char* message);
 
 void server(int port)
 {
     int listenSocket = 0;
     int socket = 0;
-    int epollServer = 0;
-    int numberOfReadyEvents = 0;
-    int count = 0;
-    struct epoll_event event;
-    struct epoll_event *events;
+    int processId = 0;
     
     // Set up the server
     initializeServer(&listenSocket, &port);
     
-    // Create the epoll server
-    epollServer = epoll_create1(0);
-    
-    if (epollServer == -1)
-    {
-        systemFatal("Unable To Create Epoll Server");
-    }
-
-    // Set up the event
-    event.data.fd = listenSocket;
-    event.events = EPOLLIN | EPOLLET;
-
-    // Attach the event to the epoll server, along with the socket
-    if (epoll_ctl(epollServer, EPOLL_CTL_ADD, listenSocket, &event) == -1)
-    {
-        systemFatal("Unable To Set Up Epoll Server With Socket");
-    }
-
-    // Buffer where the events are returned
-    events = calloc(MAX_EVENTS, sizeof event);
-    
-    // Loop to monitor the epoll server
+    // Loop to monitor the server socket
     while (1)
     {
-        // Wait indefinitely for an event (connection) to occur
-        numberOfReadyEvents = epoll_wait(epollServer, events, MAX_EVENTS, -1);
-        
-        // If we get here, we have some events, so iterate through the events
-        for (count = 0; count < numberOfReadyEvents; count++)
+        // Block here and wait for new connections
+        if ((socket = acceptConnection(&listenSocket)) != -1)
         {
-            if ((events[count].events & EPOLLERR) ||
-                (events[count].events & EPOLLHUP) ||
-                (!events[count].events & EPOLLIN))
+            // Spawn process to deal with client
+            if (processId == 0)
             {
-                // A non fatal error has occured, continue through the list
-                close(events[count].data.fd);
-                continue;
+                // Process the child connection
+                processConnection(socket);
             }
-            else if (listenSocket == events[count].data.fd)
+            else if (processId > 0)
             {
-                // We have a connection waiting on the listening socket
-                while (1)
-                {
-                    
-                    if ((socket = acceptConnection(&listenSocket)) == -1)
-                    {
-                        if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
-                        {
-                            // We are done processing connections
-                            break;
-                        }
-                        else
-                        {
-                            // Other error when trying to accept the connection
-                            // TODO: error message here
-                            break;
-                        }
-                    }
-                    
-                    // Make the socket non blocking
-                    if (makeSocketNonBlocking(&socket) == -1)
-                    {
-                        systemFatal("Cannot Set Socket To Non Blocking");
-                    }
-                    
-                    // Add the socket to list of file descriptors to monitor
-                    event.data.fd = socket;
-                    event.events = EPOLLIN | EPOLLET;
-                    if (epoll_ctl(listenSocket, EPOLL_CTL_ADD, socket, &event)
-                        == -1)
-                    {
-                        systemFatal("Unable To Add Socket To Epoll Server");
-                    }
-                }
+                // Since I am the parent, keep on going
                 continue;
             }
             else
             {
-                // Deal with incoming data here
+                // Fork failed, should shut down as this is a serious issue
+                systemFatal("Fork Failed To Create Child To Deal With Client");
             }
         }
     }
@@ -117,21 +60,75 @@ void server(int port)
 
 void processConnection(int socket)
 {
-    int done = 0;
-    int bytesRead = 0;
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
     
     // Read data from the client
     while (1)
     {
-        bytesRead = readData(&socket, &(*buffer), BUFFER_LENGTH);
-        
+        readData(&socket, buffer, BUFFER_LENGTH);
+
         switch (buffer[0])
         {
-        
+        case GET_FILE:
+            break;
+        case SEND_FILE:
+            // Add 1 to buffer to move past the control byte
+            sendFile(socket, buffer + 1);
+            break;
+        case REQUEST_LIST:
+            break;
         }
     }
 }
+
+void sendFile(int socket, char *fileName)
+{
+    int file = 0;
+    struct stat statBuffer;
+    off_t offset = 0;
+    
+    
+    if ((file = open(fileName, O_RDONLY)) == -1)
+    {
+        // Problem opening file
+        systemFatal("Problem Opening File");
+    }
+    
+    if (fstat(file, &statBuffer) == -1)
+    {
+        // Problem getting file information
+        systemFatal("Problem Getting File Information");
+    }
+    
+    // TODO: might have to ensure that the buffer size is accurate to the
+    // receiving side!
+    if (sendfile(socket, file, &offset, statBuffer.st_size) == -1)
+    {
+        // Unable to send the file
+        systemFatal("Unable To Send File");
+    }
+}
+
+void getFile()
+{
+    
+}
+
+/*
+void getFileList(char *buffer)
+{
+    int index = 0;
+    DIR *mydir = opendir("/");
+    struct dirent *entry = NULL;
+    
+    while ((entry = readdir(mydir)))
+    {
+        break;
+    }
+    
+    closedir(mydir);
+}
+*/
 
 /*
 -- FUNCTION: initializeServer
