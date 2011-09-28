@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
+#include <strings.h>
 
 #include "server.h"
 #include "../network/network.h"
@@ -15,6 +16,7 @@
 #define GET_FILE 0
 #define SEND_FILE 1
 #define REQUEST_LIST 2
+#define FILE_SIZE 3
 
 void initializeServer(int *listenSocket, int *port);
 void processConnection(int socket);
@@ -81,37 +83,61 @@ void processConnection(int socket)
     }
 }
 
+void getFile(int socket, char *fileName)
+{
+    FILE *file = NULL;
+    
+    // Open the file
+    file = fopen(fileName, "wb");
+    if (file == NULL)
+    {
+        systemFatal("Unable To Create File");
+    }
+    
+    // Write the file to disk
+    
+    // Close the file
+    fclose(file);
+    
+    // Change the permission on the new file to allow access
+    chmod(fileName, 00400 | 00200 | 00100);
+}
+
 void sendFile(int socket, char *fileName)
 {
     int file = 0;
     struct stat statBuffer;
     off_t offset = 0;
+    //char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
+    char *buffer = (char*)calloc(BUFFER_LENGTH, sizeof(char));
     
-    
+    // Open the file for reading
     if ((file = open(fileName, O_RDONLY)) == -1)
     {
-        // Problem opening file
         systemFatal("Problem Opening File");
     }
     
+    // Ensure that the were able to get the file statistics
     if (fstat(file, &statBuffer) == -1)
     {
-        // Problem getting file information
         systemFatal("Problem Getting File Information");
     }
+    
+    // Send a control message with the size of the file
+    *buffer = FILE_SIZE;
+    bcopy((void*)statBuffer.st_size, buffer + 1, sizeof(off_t));
+    sendData(&socket, buffer, BUFFER_LENGTH);
     
     // TODO: might have to ensure that the buffer size is accurate to the
     // receiving side!
     if (sendfile(socket, file, &offset, statBuffer.st_size) == -1)
     {
-        // Unable to send the file
         systemFatal("Unable To Send File");
     }
-}
-
-void getFile()
-{
     
+    // Close the file
+    close(file);
+    free(buffer);
 }
 
 /*
