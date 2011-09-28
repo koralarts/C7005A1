@@ -102,14 +102,12 @@ void server(int port)
                     {
                         systemFatal("Unable To Add Socket To Epoll Server");
                     }
-                    
-                    // Send a new port to the client
                 }
                 continue;
             }
             else
             {
-                
+                // Deal with incoming data here
             }
         }
     }
