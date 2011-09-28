@@ -85,7 +85,17 @@ void processConnection(int socket)
 
 void getFile(int socket, char *fileName)
 {
+    char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
+    int count = 0;
+    int bytesRead = 0;
+    off_t fileSize = 0;
     FILE *file = NULL;
+    
+    // Get the control packet with the file size
+    readData(&socket, buffer, BUFFER_LENGTH);
+    
+    // Retrieve file size from the buffer
+    bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
     
     // Open the file
     file = fopen(fileName, "wb");
@@ -94,13 +104,31 @@ void getFile(int socket, char *fileName)
         systemFatal("Unable To Create File");
     }
     
-    // Write the file to disk
+    // Read from the socket and write the file to disk
+    while (count < (fileSize - BUFFER_LENGTH))
+    {
+        bytesRead = readData(&socket, buffer, BUFFER_LENGTH);
+        if (fwrite(buffer, sizeof(char), bytesRead, file) != bytesRead)
+        {
+            systemFatal("Unable To Write To File");
+        }
+        count += bytesRead;
+    }
     
+    // Retrieve any left over data and write it out
+    bytesRead = readData(&socket, buffer, fileSize - count);
+    if (fwrite(buffer, sizeof(char), bytesRead, file) != bytesRead)
+    {
+        systemFatal("Unable To Write To File");
+    }
+
     // Close the file
     fclose(file);
     
     // Change the permission on the new file to allow access
     chmod(fileName, 00400 | 00200 | 00100);
+    
+    free(buffer);
 }
 
 void sendFile(int socket, char *fileName)
