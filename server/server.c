@@ -150,8 +150,7 @@ void sendFile(int socket, char *fileName)
     bcopy((void*)statBuffer.st_size, buffer + 1, sizeof(off_t));
     sendData(&socket, buffer, BUFFER_LENGTH);
     
-    // TODO: might have to ensure that the buffer size is accurate to the
-    // receiving side!
+    // Send the file to the client
     if (sendfile(socket, file, &offset, statBuffer.st_size) == -1)
     {
         systemFatal("Unable To Send File");
