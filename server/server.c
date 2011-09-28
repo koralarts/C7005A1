@@ -10,8 +10,10 @@
 
 #define MAX_EVENTS 64
 #define BUFFER_LENGTH 512
+#define PORT_RANGE 10000
 
 void initializeServer(int *listenSocket, int *port);
+int getFreePort(char *buffer, int startingPort);
 static void systemFatal(const char* message);
 
 void server(int port)
@@ -70,6 +72,7 @@ void server(int port)
                 // We have a connection waiting on the listening socket
                 while (1)
                 {
+                    
                     if ((socket = acceptConnection(&listenSocket)) == -1)
                     {
                         if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
@@ -84,6 +87,7 @@ void server(int port)
                             break;
                         }
                     }
+                    
                     // Make the socket non blocking
                     if (makeSocketNonBlocking(&socket) == -1)
                     {
@@ -103,7 +107,7 @@ void server(int port)
             }
             else
             {
-                // We have a file transfer waiting to happen, spawn a process
+                // Deal with incoming data here
             }
         }
     }
@@ -115,7 +119,7 @@ void processConnection(int socket)
 {
     int done = 0;
     int bytesRead = 0;
-    char *buffer = (char*)malloc(sizeof(char)* BUFFER_LENGTH);
+    char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
     
     // Read data from the client
     while (1)
