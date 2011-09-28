@@ -47,6 +47,9 @@ void server(int port)
         {
             // Process the child connection
             processConnection(socket);
+            // Once we are done, exit
+            close(socket);
+            return;
         }
         else if (processId > 0)
         {
@@ -58,7 +61,6 @@ void server(int port)
             // Fork failed, should shut down as this is a serious issue
             systemFatal("Fork Failed To Create Child To Deal With Client");
         }
-        printf("End of while loop");
     }
     
     printf("Server Closing!\n");
