@@ -1,16 +1,25 @@
 #include "client.h"
-#include <stdlib.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/sendfile.h>
+#include <fcntl.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
+#include <errno.h>
+#include <dirent.h>
+#include <strings.h>
+#include <time.h>
 
-#define USAGE		"Usage: %s -i [ip address]\n"
+#define USAGE		"Usage: %s -i [ip address] -p [transfer server port]\n"
 
 int main(int argc, char** argv)
 {
 	char* ipAddr = 0;
 	int port = 0;
 	int option = 0;
+	int controlSocket;
+	int transferSocket;
 
 	if(argc != 3) {
 		fprintf(stderr, "Not Enough Arguments\n");
@@ -18,13 +27,16 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
 	}
 
-	while((option = getopt(argc, argv, ":i:")) != -1)
+	while((option = getopt(argc, argv, ":i:p:")) != -1)
     {
         switch(option)
         {
         case 'i':
             ipAddr = optarg;
             break;
+        case 'p':
+        	port = atoi(optarg);
+        	break;
         default:
             fprintf(stderr, USAGE, argv[0]);
             exit(EXIT_FAILURE);
@@ -36,61 +48,21 @@ int main(int argc, char** argv)
     	fprintf(stderr, USAGE, argv[0]);
         exit(EXIT_FAILURE);
     }
+    if(port == 0) {
+    	srand(time(NULL));
+    	port = rand() % 7000 + 2999;
+    }
 
-	// Connecting to server
-	if((port = processParent(ipAddr)) == 0) {
-		systemFatal("Invalid Port\n");
-	}
-	
-	processChild(ipAddr, port);
+	printf("Connecting to control Server: %s\n", ipAddr);
+	controlSocket = initConnection(DEF_PORT, ipAddr);
+	transferSocket = initConnection(port, ipAddr);
+	processCommand(&controlSocket, &transferSocket);
 
 	return 0;
 }
 
 /*
--- FUNCTION: processParent
---
--- DATE: September 23, 2011
---
--- REVISIONS: 
--- September 25, 2011 - removed socket and port as part of the arguments and 
--- moved the creation of the socket inside.
--- September 27, 2011 - moved the creation of the socket to a helper function.
---
--- DESIGNER: Karl Castillo
---
--- PROGRAMMER: Karl Castillo
---
--- INTERFACE: int processParent(const char* ip);
---				ip - ip address of the server
---
--- RETURNS: int > 0 - the dynamically created port
---				== 0 - invalid port
---
--- NOTES:
--- This function sets up the required client connections to connect to the
--- main server, such as creating a socket, setting the socket to reuse mode,
--- binding it to an address, and setting it to listen. If an error occurs, the
--- function calls "systemFatal" with an error message.
-*/
-int processParent(const char* ip) 
-{
-	int socket;
-	char* reply = (char*)malloc(sizeof(char) * MAX_PORT_SIZE);
-	
-	socket = initConnection(DEF_PORT, ip);
-	
-	// Wait for port respond
-	if(readData(&socket, reply, MAX_PORT_SIZE) == -1) {
-		systemFatal("Error Reading from Socket\n");
-	}
-	
-	// Convert reply to int
-	return atoi(reply);
-}
-
-/*
--- FUNCTION: processChild
+-- FUNCTION: processCommand
 --
 -- DATE: September 23, 2011
 --
@@ -98,14 +70,15 @@ int processParent(const char* ip)
 -- September 25, 2011 - removed socket as part of the arguments and moved the 
 -- creation of the socket inside.
 -- September 27, 2011 - moved the creation of the socket to a helper function
+-- September 27, 2011 - changed arguments to controlSocket and transferSocket
 --
 -- DESIGNER: Karl Castillo
 --
 -- PROGRAMMER: Karl Castillo
 --
--- INTERFACE: void processChild(const char* ip, int port);
---				ip - ip address of the server
---				port - the port to connect to
+-- INTERFACE: void processCommand(int* controlSocket, int* transferSocket);
+--				controlSocket - pointer to the controlSocket
+--				transferSocket - pointer to the transferSocket
 --
 -- RETURNS: void
 --
@@ -125,43 +98,49 @@ int processParent(const char* ip)
 -- s - send a file to the server
 -- h - show a list of available commands
 */
-void processChild(const char* ip, int port)
+void processCommand(int* controlSocket, int* transferSocket)
 {
-	int socket, cmd, space, numRead;
-	char fileName[FILENAME_MAX];
-	
-	socket = initConnection(port, ip);
+	int numRead = 0;
+	char* cmd = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 	
 	// Print help
 	printHelp();
 	
 	while(TRUE) {
-		memset(fileName, '\0', FILENAME_MAX);
 		printf("$ ");
 		
-		if((numRead = scanf("%d%d%s", &cmd, &space, fileName)) == EOF) { 
-			cmd = 'e';
+		if((numRead = scanf("%c%s", &(cmd[0]), (cmd + 1))) == EOF) { 
+			cmd[0] = 'e';
 		}
 		
-		switch(cmd) {
+		switch(cmd[0]) {
 		case 'e': // exit
-			closeSocket(&socket);
+			closeSocket(controlSocket);
+			closeSocket(transferSocket);
 			exit(EXIT_SUCCESS);
 		case 'l': // list files
-			listFile(&socket);
+			listFile(controlSocket, transferSocket);
 			break;
 		case 'r': // receive file
-			if(numRead != 3) {
+			if(numRead != 2) {
 				perror("Invalid Command. h for help\n");
 			} else {
-				receiveFile(&socket, fileName);
+				// Send Command and file name
+				if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
+					systemFatal("Error sending receive command\n");
+				}
+				receiveFile(controlSocket, transferSocket, cmd + 1);
 			}
 			break;
 		case 's': // send file
-			if(numRead != 3) {
+			if(numRead != 2) {
 				perror("Invalid Command. h for help\n");
 			} else {
-				sendFile(&socket, fileName);
+				// Send Command and file name
+				if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
+					systemFatal("Error sending send command\n");
+				}
+				sendFile(controlSocket, transferSocket, cmd + 1);
 			}
 			break;
 		case 'h': // show commands
@@ -194,24 +173,28 @@ void processChild(const char* ip, int port)
 -- 
 -- Once the reply is received, it will be printed in order of receiving.
 */
-void listFile(int* socket)
+void listFile(int* controlSocket, int* transferSocket)
 {	
-	char cmd[2] = "l";
-	char files[FILENAME_MAX];
+	char cmd[BUFFER_LENGTH] = "l";
+	char files[BUFFER_LENGTH];
+	int dataRead;
 	
 	// Send Command
-	if(sendData(socket, cmd, sizeof(cmd)) == -1) {
+	if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
 		systemFatal("Error sending list command\n");
 	}
 	
-	// Receive File List
-	if(readData(socket, files, FILENAME_MAX) == -1) {
-		systemFatal("Error receiving file list\n");
-	}
-	
-	// Print File List
 	system("clear");
-	printf("File List\n%s", files);
+	
+	while(TRUE) {
+		// Receive File List
+		dataRead = readData(transferSocket, files, FILENAME_MAX);
+		if(dataRead <= 0) {
+			break;
+		}
+		// Print File List
+		printf("%s", files);
+	}
 }
 
 
@@ -241,30 +224,47 @@ void listFile(int* socket)
 -- Once all the contents of the file are received and written to a file, the
 -- program will print out a success message.
 */
-void receiveFile(int* socket, const char* fileName)
+void receiveFile(int* controlSocket, int* transferSocket, const char* fileName)
 {
-	char cmd[2] = "r";
-	FILE* file;
+	char cmd[BUFFER_LENGTH] = "r";
+	char* buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
+	FILE* file = NULL;
+	off_t fileSize = 0;
+	int bytesRead = 0;
+	int count = 0;
 	
 	// Send Command
-	if(sendData(socket, cmd, sizeof(cmd)) == -1) {
+	if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
 		systemFatal("Error sending receive command\n");
 	}
 	
 	// Send file name to receive
-	if(sendData(socket, fileName, FILENAME_MAX) == -1) {
+	if(sendData(controlSocket, fileName, BUFFER_LENGTH) == -1) {
 		systemFatal("Error sending receive filename\n");
 	}
 	
-	if((file = fopen(fileName, "w")) == NULL) {
+	readData(controlSocket, buffer, BUFFER_LENGTH);
+	bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
+	
+	if((file = fopen(fileName, "wb")) == NULL) {
 		fprintf(stderr, "Error opening file: %s\n", fileName);
 		return;
 	}
 	
-	while(TRUE) {
-		
-	}
+	while (count < (fileSize - BUFFER_LENGTH)) {
+        bytesRead = readData(transferSocket, buffer, BUFFER_LENGTH);
+        fwrite(buffer, sizeof(char), bytesRead, file);
+        count += bytesRead;
+    }
 	
+	bytesRead = readData(transferSocket, buffer, fileSize - count);
+    fwrite(buffer, sizeof(char), bytesRead, file);
+	
+	fclose(file);
+	
+	chmod(fileName, 00400 | 00200 | 00100);
+    
+    free(buffer);
 }
 
 
@@ -294,7 +294,40 @@ void receiveFile(int* socket, const char* fileName)
 -- Once all the contents of the file are received and written to a file, the
 -- program will print out a success message.
 */
-void sendFile(int* socket, const char* fileName){}
+void sendFile(int* controlSocket, int* transferSocket, const char* fileName)
+{
+	struct stat statBuffer;
+	char* buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
+	int file = 0;
+    off_t offset = 0;
+	
+	// Send file name to receive
+	if(sendData(controlSocket, fileName, BUFFER_LENGTH) == -1) {
+		systemFatal("Error sending receive filename\n");
+	}
+	
+	if ((file = open(fileName, O_RDONLY)) == -1) {
+		fprintf(stderr, "Error opening file: %s\n", fileName);
+		return;
+	}
+	
+	if (fstat(file, &statBuffer) == -1) {
+        systemFatal("Error Getting File Information\n");
+    }
+	
+	*buffer = FILE_SIZE;
+    bcopy((void*)statBuffer.st_size, buffer + 1, sizeof(off_t));
+    sendData(controlSocket, buffer, BUFFER_LENGTH);
+    
+    // Send the file to the client
+    if (sendfile(*transferSocket, file, &offset, statBuffer.st_size) == -1) {
+        fprintf(stderr, "Error sending %s\n", fileName);
+    }
+    
+    // Close the file
+    close(file);
+    free(buffer);
+}
 
 int initConnection(int port, const char* ip) 
 {
@@ -322,8 +355,8 @@ void printHelp()
 	system("clear");
 	printf("Super File Transfer\n");
 	printf("l - list transferable files\n");
-	printf("r [[file name]] - receive file\n");
-	printf("s [[file name]] - send file\n");
+	printf("r[[file name]] - receive file\n");
+	printf("s[[file name]] - send file\n");
 	printf("h - help\n");
 	printf("e - exit\n");
 }

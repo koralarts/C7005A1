@@ -1,7 +1,9 @@
 #ifndef NETWORK_H
 #define NETWORK_H
 
-#define DEF_PORT 7001
+#define DEF_PORT 		7001
+#define BUFFER_LENGTH 	275
+#define FILE_SIZE		3
 
 // Function Prototypes
 #ifdef __cplusplus

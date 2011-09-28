@@ -11,7 +11,6 @@
 #include "server.h"
 #include "../network/network.h"
 
-#define BUFFER_LENGTH 257
 #define GET_FILE 0
 #define SEND_FILE 1
 #define REQUEST_LIST 2
