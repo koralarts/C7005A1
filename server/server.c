@@ -45,6 +45,7 @@ void server(int port)
         // Spawn process to deal with client
         if (processId == 0)
         {
+            close(listenSocket);
             // Process the child connection
             processConnection(socket);
             // Once we are done, exit
@@ -54,6 +55,7 @@ void server(int port)
         else if (processId > 0)
         {
             // Since I am the parent, keep on going
+            close(socket);
             continue;
         }
         else
@@ -138,7 +140,6 @@ void sendFile(int socket, char *fileName)
     int file = 0;
     struct stat statBuffer;
     off_t offset = 0;
-    //char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
     char *buffer = (char*)calloc(BUFFER_LENGTH, sizeof(char));
     
     // Open the file for reading
@@ -169,11 +170,11 @@ void sendFile(int socket, char *fileName)
     free(buffer);
 }
 
-/*
+
 void getFileList(char *buffer)
 {
     int index = 0;
-    DIR *mydir = opendir("/");
+    DIR *mydir = opendir(".");
     struct dirent *entry = NULL;
     
     while ((entry = readdir(mydir)))
@@ -183,7 +184,6 @@ void getFileList(char *buffer)
     
     closedir(mydir);
 }
-*/
 
 /*
 -- FUNCTION: initializeServer
