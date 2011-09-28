@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/sendfile.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -8,14 +11,14 @@
 #include "server.h"
 #include "../network/network.h"
 
-#define MAX_EVENTS 64
-#define BUFFER_LENGTH 512
+#define BUFFER_LENGTH 257
 #define GET_FILE 0
 #define SEND_FILE 1
 #define REQUEST_LIST 2
 
 void initializeServer(int *listenSocket, int *port);
 void processConnection(int socket);
+void sendFile(int socket, char *fileName);
 static void systemFatal(const char* message);
 
 void server(int port)
@@ -57,24 +60,52 @@ void server(int port)
 
 void processConnection(int socket)
 {
-    int done = 0;
-    int bytesRead = 0;
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
     
     // Read data from the client
     while (1)
     {
-        bytesRead = readData(&socket, &(*buffer), BUFFER_LENGTH);
-        
+        readData(&socket, buffer, BUFFER_LENGTH);
+
         switch (buffer[0])
         {
         case GET_FILE:
             break;
         case SEND_FILE:
+            // Add 1 to buffer to move past the control byte
+            sendFile(socket, buffer + 1);
             break;
         case REQUEST_LIST:
             break;
         }
+    }
+}
+
+void sendFile(int socket, char *fileName)
+{
+    int file = 0;
+    struct stat statBuffer;
+    off_t offset = 0;
+    
+    
+    if ((file = open(fileName, O_RDONLY)) == -1)
+    {
+        // Problem opening file
+        systemFatal("Problem Opening File");
+    }
+    
+    if (fstat(file, &statBuffer) == -1)
+    {
+        // Problem getting file information
+        systemFatal("Problem Getting File Information");
+    }
+    
+    // TODO: might have to ensure that the buffer size is accurate to the
+    // receiving side!
+    if (sendfile(socket, file, &offset, statBuffer.st_size) == -1)
+    {
+        // Unable to send the file
+        systemFatal("Unable To Send File");
     }
 }
 
@@ -83,6 +114,7 @@ void getFile()
     
 }
 
+/*
 void getFileList(char *buffer)
 {
     int index = 0;
@@ -91,11 +123,12 @@ void getFileList(char *buffer)
     
     while ((entry = readdir(mydir)))
     {
-        
+        break;
     }
     
     closedir(mydir);
 }
+*/
 
 /*
 -- FUNCTION: initializeServer
