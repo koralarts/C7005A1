@@ -20,6 +20,7 @@
 
 void initializeServer(int *listenSocket, int *port);
 void processConnection(int socket);
+void getFile(int socket, char *fileName);
 void sendFile(int socket, char *fileName);
 static void systemFatal(const char* message);
 
@@ -36,25 +37,28 @@ void server(int port)
     while (1)
     {
         // Block here and wait for new connections
-        if ((socket = acceptConnection(&listenSocket)) != -1)
+        if ((socket = acceptConnection(&listenSocket)) == -1)
         {
-            // Spawn process to deal with client
-            if (processId == 0)
-            {
-                // Process the child connection
-                processConnection(socket);
-            }
-            else if (processId > 0)
-            {
-                // Since I am the parent, keep on going
-                continue;
-            }
-            else
-            {
-                // Fork failed, should shut down as this is a serious issue
-                systemFatal("Fork Failed To Create Child To Deal With Client");
-            }
+            systemFatal("Can't Accept Client");
         }
+        printf("New Client!");
+        // Spawn process to deal with client
+        if (processId == 0)
+        {
+            // Process the child connection
+            processConnection(socket);
+        }
+        else if (processId > 0)
+        {
+            // Since I am the parent, keep on going
+            continue;
+        }
+        else
+        {
+            // Fork failed, should shut down as this is a serious issue
+            systemFatal("Fork Failed To Create Child To Deal With Client");
+        }
+        printf("End of while loop");
     }
     
     printf("Server Closing!\n");
@@ -72,6 +76,8 @@ void processConnection(int socket)
         switch (buffer[0])
         {
         case GET_FILE:
+            // Add 1 to buffer to move past the control byte
+            getFile(socket, buffer + 1);
             break;
         case SEND_FILE:
             // Add 1 to buffer to move past the control byte
@@ -217,12 +223,6 @@ void initializeServer(int *listenSocket, int *port)
     if (bindAddress(&(*port), &(*listenSocket)) == -1)
     {
         systemFatal("Cannot Bind Address To Socket");
-    }
-    
-    // Make the socket non blocking
-    if (makeSocketNonBlocking(&(*listenSocket)) == -1)
-    {
-        systemFatal("Cannot Set Socket To Non Blocking");
     }
     
     // Set the socket to listen for connections
