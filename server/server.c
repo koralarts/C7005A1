@@ -33,6 +33,7 @@ void server(int port)
     initializeServer(&listenSocket, &port);
     
     // Loop to monitor the server socket
+    printf("waiting for clients\n");
     while (1)
     {
         // Block here and wait for new connections
@@ -40,8 +41,9 @@ void server(int port)
         {
             systemFatal("Can't Accept Client");
         }
-        printf("New Client!");
+
         // Spawn process to deal with client
+        processId = fork();
         if (processId == 0)
         {
             close(listenSocket);
@@ -70,7 +72,7 @@ void server(int port)
 void processConnection(int socket)
 {
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
-    
+
     // Read data from the client
     while (1)
     {
@@ -169,7 +171,7 @@ void sendFile(int socket, char *fileName)
     free(buffer);
 }
 
-
+/*
 void getFileList(char *buffer)
 {
     int index = 0;
@@ -183,7 +185,7 @@ void getFileList(char *buffer)
     
     closedir(mydir);
 }
-
+*/
 /*
 -- FUNCTION: initializeServer
 --
