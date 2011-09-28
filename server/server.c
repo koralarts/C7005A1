@@ -108,19 +108,13 @@ void getFile(int socket, char *fileName)
     while (count < (fileSize - BUFFER_LENGTH))
     {
         bytesRead = readData(&socket, buffer, BUFFER_LENGTH);
-        if (fwrite(buffer, sizeof(char), bytesRead, file) != bytesRead)
-        {
-            systemFatal("Unable To Write To File");
-        }
+        fwrite(buffer, sizeof(char), bytesRead, file);
         count += bytesRead;
     }
     
     // Retrieve any left over data and write it out
     bytesRead = readData(&socket, buffer, fileSize - count);
-    if (fwrite(buffer, sizeof(char), bytesRead, file) != bytesRead)
-    {
-        systemFatal("Unable To Write To File");
-    }
+    fwrite(buffer, sizeof(char), bytesRead, file);
 
     // Close the file
     fclose(file);
