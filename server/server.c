@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
+#include <strings.h>
 
 #include "server.h"
 #include "../network/network.h"
@@ -14,9 +15,11 @@
 #define GET_FILE 0
 #define SEND_FILE 1
 #define REQUEST_LIST 2
+#define FILE_SIZE 3
 
 void initializeServer(int *listenSocket, int *port);
 void processConnection(int socket);
+void getFile(int socket, char *fileName);
 void sendFile(int socket, char *fileName);
 static void systemFatal(const char* message);
 
@@ -33,24 +36,31 @@ void server(int port)
     while (1)
     {
         // Block here and wait for new connections
-        if ((socket = acceptConnection(&listenSocket)) != -1)
+        if ((socket = acceptConnection(&listenSocket)) == -1)
         {
-            // Spawn process to deal with client
-            if (processId == 0)
-            {
-                // Process the child connection
-                processConnection(socket);
-            }
-            else if (processId > 0)
-            {
-                // Since I am the parent, keep on going
-                continue;
-            }
-            else
-            {
-                // Fork failed, should shut down as this is a serious issue
-                systemFatal("Fork Failed To Create Child To Deal With Client");
-            }
+            systemFatal("Can't Accept Client");
+        }
+        printf("New Client!");
+        // Spawn process to deal with client
+        if (processId == 0)
+        {
+            close(listenSocket);
+            // Process the child connection
+            processConnection(socket);
+            // Once we are done, exit
+            close(socket);
+            return;
+        }
+        else if (processId > 0)
+        {
+            // Since I am the parent, keep on going
+            close(socket);
+            continue;
+        }
+        else
+        {
+            // Fork failed, should shut down as this is a serious issue
+            systemFatal("Fork Failed To Create Child To Deal With Client");
         }
     }
     
@@ -69,6 +79,8 @@ void processConnection(int socket)
         switch (buffer[0])
         {
         case GET_FILE:
+            // Add 1 to buffer to move past the control byte
+            getFile(socket, buffer + 1);
             break;
         case SEND_FILE:
             // Add 1 to buffer to move past the control byte
@@ -80,44 +92,88 @@ void processConnection(int socket)
     }
 }
 
+void getFile(int socket, char *fileName)
+{
+    char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
+    int count = 0;
+    int bytesRead = 0;
+    off_t fileSize = 0;
+    FILE *file = NULL;
+    
+    // Get the control packet with the file size
+    readData(&socket, buffer, BUFFER_LENGTH);
+    
+    // Retrieve file size from the buffer
+    bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
+    
+    // Open the file
+    file = fopen(fileName, "wb");
+    if (file == NULL)
+    {
+        systemFatal("Unable To Create File");
+    }
+    
+    // Read from the socket and write the file to disk
+    while (count < (fileSize - BUFFER_LENGTH))
+    {
+        bytesRead = readData(&socket, buffer, BUFFER_LENGTH);
+        fwrite(buffer, sizeof(char), bytesRead, file);
+        count += bytesRead;
+    }
+    
+    // Retrieve any left over data and write it out
+    bytesRead = readData(&socket, buffer, fileSize - count);
+    fwrite(buffer, sizeof(char), bytesRead, file);
+
+    // Close the file
+    fclose(file);
+    
+    // Change the permission on the new file to allow access
+    chmod(fileName, 00400 | 00200 | 00100);
+    
+    free(buffer);
+}
+
 void sendFile(int socket, char *fileName)
 {
     int file = 0;
     struct stat statBuffer;
     off_t offset = 0;
+    char *buffer = (char*)calloc(BUFFER_LENGTH, sizeof(char));
     
-    
+    // Open the file for reading
     if ((file = open(fileName, O_RDONLY)) == -1)
     {
-        // Problem opening file
         systemFatal("Problem Opening File");
     }
     
+    // Ensure that the were able to get the file statistics
     if (fstat(file, &statBuffer) == -1)
     {
-        // Problem getting file information
         systemFatal("Problem Getting File Information");
     }
     
-    // TODO: might have to ensure that the buffer size is accurate to the
-    // receiving side!
+    // Send a control message with the size of the file
+    *buffer = FILE_SIZE;
+    bcopy((void*)statBuffer.st_size, buffer + 1, sizeof(off_t));
+    sendData(&socket, buffer, BUFFER_LENGTH);
+    
+    // Send the file to the client
     if (sendfile(socket, file, &offset, statBuffer.st_size) == -1)
     {
-        // Unable to send the file
         systemFatal("Unable To Send File");
     }
-}
-
-void getFile()
-{
     
+    // Close the file
+    close(file);
+    free(buffer);
 }
 
-/*
+
 void getFileList(char *buffer)
 {
     int index = 0;
-    DIR *mydir = opendir("/");
+    DIR *mydir = opendir(".");
     struct dirent *entry = NULL;
     
     while ((entry = readdir(mydir)))
@@ -127,7 +183,6 @@ void getFileList(char *buffer)
     
     closedir(mydir);
 }
-*/
 
 /*
 -- FUNCTION: initializeServer
@@ -169,12 +224,6 @@ void initializeServer(int *listenSocket, int *port)
     if (bindAddress(&(*port), &(*listenSocket)) == -1)
     {
         systemFatal("Cannot Bind Address To Socket");
-    }
-    
-    // Make the socket non blocking
-    if (makeSocketNonBlocking(&(*listenSocket)) == -1)
-    {
-        systemFatal("Cannot Set Socket To Non Blocking");
     }
     
     // Set the socket to listen for connections
