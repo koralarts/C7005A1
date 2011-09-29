@@ -332,6 +332,9 @@ void sendFile(int* controlSocket, int* transferSocket, const char* fileName)
 int initConnection(int port, const char* ip) 
 {
 	int socket;
+	
+	printf("Port: %d\n", port);
+	
 	// Creating Socket
 	if((socket = tcpSocket()) == -1) {
 		systemFatal("Error Creating Socket\n");
