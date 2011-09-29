@@ -31,7 +31,7 @@ void server(int port)
     int socket = 0;
     int processId = 0;
     char clientIp[16];
-    unsigned short *clientPort = 0;
+    unsigned short *clientPort = (unsigned short*)malloc(sizeof(unsigned short));
     
     // Set up the server
     initializeServer(&listenSocket, &port);
@@ -203,7 +203,7 @@ void getFileList(char *buffer)
 
 void createTransferSocket(int *socket)
 {
-    int *defaultPort = malloc(sizeof(int));
+    int *defaultPort = (int*)malloc(sizeof(int));
     *defaultPort = TRANSFER_PORT;
     
     // Create a TCP socket
