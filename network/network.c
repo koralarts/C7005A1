@@ -229,7 +229,7 @@ int acceptConnectionIpPort(int *listenSocket, char *ip, unsigned short *port)
     socklen_t addrlen = sizeof(clientAddress);
     sock = accept(*listenSocket, (struct sockaddr *) &clientAddress, &addrlen);
     strcpy(ip, inet_ntoa(clientAddress.sin_addr));
-    *port = clientAddress.sin_port;
+    *port = htons(clientAddress.sin_port);
     return sock;
 }
 
