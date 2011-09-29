@@ -211,21 +211,24 @@ int acceptConnectionIp(int *listenSocket, char *ip)
 --
 -- PROGRAMMER: Luke Queenan
 --
--- INTERFACE: int acceptConnectionPort(int *listenSocket, unsigned short *port);
+-- INTERFACE: int acceptConnectionIpPort(int *listenSocket, char *ip,
+--                                       unsigned short *port);
 --
 -- RETURNS: the new socket created for the connection
 --
 -- NOTES:
 -- This is the wrapper function for accepting a connection from the specified
 -- socket. If you need the client's ip address, you can pass a char* to the
--- function. You must ensure that the length of the ip array is long enough.
+-- function. You must ensure that the length of the ip array is long enough. If
+-- you need the client's port, you can pass an unsigned short* to the function.
 */
-int acceptConnectionPort(int *listenSocket, unsigned short *port)
+int acceptConnectionIpPort(int *listenSocket, char *ip, unsigned short *port)
 {
     int sock = 0;
     struct sockaddr_in clientAddress;
     socklen_t addrlen = sizeof(clientAddress);
     sock = accept(*listenSocket, (struct sockaddr *) &clientAddress, &addrlen);
+    strcpy(ip, inet_ntoa(clientAddress.sin_addr));
     *port = clientAddress.sin_port;
     return sock;
 }
