@@ -98,11 +98,11 @@ void processConnection(int socket, char *ip, int port)
     {
     case GET_FILE:
         // Add 1 to buffer to move past the control byte
-        getFile(transferSocket, buffer + 1);
+        sendFile(transferSocket, buffer + 1);
         break;
     case SEND_FILE:
         // Add 1 to buffer to move past the control byte
-        sendFile(transferSocket, buffer + 1);
+        getFile(transferSocket, buffer + 1);
         break;
     case REQUEST_LIST:
         break;

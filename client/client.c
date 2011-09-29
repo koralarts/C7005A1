@@ -297,7 +297,7 @@ void sendFile(int port, const char* fileName)
     }
 
     bcopy((void*)&statBuffer.st_size, buffer, sizeof(off_t));
-    sendData(&transferSocket, buffer, BUFFER_LENGTH);
+    //sendData(&transferSocket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client
     if (sendfile(transferSocket, file, &offset, statBuffer.st_size) == -1) {
@@ -344,26 +344,30 @@ void printHelp()
 	printf("e - exit\n");
 }
 
-void initalizeServer(int* listenSocket, int* port)
+void initalizeServer(int* socket, int* port)
 {
     // Create a TCP socket
-    if ((*listenSocket = tcpSocket()) == -1) {
+    if ((*socket = tcpSocket()) == -1) {
         systemFatal("Cannot Create Socket!");
     }
     
     // Allow the socket to be reused immediately after exit
-    if (setReuse(&(*listenSocket)) == -1) {
+    if (setReuse(&(*socket)) == -1) {
         systemFatal("Cannot Set Socket To Reuse");
     }
     
     // Bind an address to the socket
-    if (bindAddress(port, listenSocket) == -1) {
+    if (bindAddress(port, socket) == -1) {
         systemFatal("Cannot Bind Address To Socket");
     }
     
     // Set the socket to listen for connections
-    if (setListen(&(*listenSocket)) == -1) {
+    if (setListen(&(*socket)) == -1) {
         systemFatal("Cannot Listen On Socket");
+    }
+    
+    if(acceptConnection(&(*socket)) == -1) {
+    	systemFatal("Cannot Accept on Socket");
     }
 }
 
