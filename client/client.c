@@ -137,6 +137,9 @@ void processCommand(int* controlSocket)
 		case 'h': // show commands
 			printHelp();
 			break;
+		case 'f':
+			system("ls");
+			break;
 		default:
 			printf("Invalid Command. Type h for a list of commands.\n");
 		}
@@ -293,11 +296,11 @@ void sendFile(int port, const char* fileName)
 	}
 	
 	if (fstat(file, &statBuffer) == -1) {
-        systemFatal("Error Getting File Information\n");
+        systemFatal("Error Getting File Information");
     }
 
     bcopy((void*)&statBuffer.st_size, buffer, sizeof(off_t));
-    //sendData(&transferSocket, buffer, BUFFER_LENGTH);
+    sendData(&transferSocket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client
     if (sendfile(transferSocket, file, &offset, statBuffer.st_size) == -1) {
@@ -317,17 +320,17 @@ int initConnection(int port, const char* ip)
 	
 	// Creating Socket
 	if((socket = tcpSocket()) == -1) {
-		systemFatal("Error Creating Socket\n");
+		systemFatal("Error Creating Socket");
 	}
 
 	// Setting Socket to Reuse
 	if(setReuse(&socket) == -1) {
-		systemFatal("Error Set Socket Reuse\n");
+		systemFatal("Error Set Socket Reuse");
 	}
 	
 	// Connect to transfer server
 	if(connectToServer(&port, &socket, ip) == -1) {
-		systemFatal("Cannot Connect to server\n");
+		systemFatal("Cannot Connect to server");
 	}
 	
 	return socket;
@@ -376,7 +379,7 @@ int getPort(int* socket)
 	struct sockaddr_in sin;
 	socklen_t len = sizeof(sin);
 	if (getsockname(*socket, (struct sockaddr *)&sin, &len) == -1) {
-		systemFatal("getsockname Error\n");
+		systemFatal("getsockname Error");
 	}
 	return ntohs(sin.sin_port);
 }
