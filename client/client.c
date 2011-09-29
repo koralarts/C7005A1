@@ -233,7 +233,7 @@ void receiveFile(int* controlSocket, int* transferSocket, const char* fileName)
 	int bytesRead = 0;
 	int count = 0;
 	
-	readData(controlSocket, buffer, BUFFER_LENGTH);
+	readData(transferSocket, buffer, BUFFER_LENGTH);
 	bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
 	
 	if((file = fopen(fileName, "wb")) == NULL) {
@@ -299,10 +299,9 @@ void sendFile(int* controlSocket, int* transferSocket, const char* fileName)
 	if (fstat(file, &statBuffer) == -1) {
         systemFatal("Error Getting File Information\n");
     }
-	
-	*buffer = FILE_SIZE;
-    bcopy((void*)&statBuffer.st_size, buffer + 1, sizeof(off_t));
-    sendData(controlSocket, buffer, BUFFER_LENGTH);
+
+    bcopy((void*)&statBuffer.st_size, buffer, sizeof(off_t));
+    sendData(transferSocket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client
     if (sendfile(*transferSocket, file, &offset, statBuffer.st_size) == -1) {
