@@ -12,16 +12,18 @@
 #include <time.h>
 
 #define USAGE		"Usage: %s -i [ip address] -p [transfer server port]\n"
+#define RECEIVE		0
+#define SEND		1
 
 int main(int argc, char** argv)
 {
 	char* ipAddr = 0;
 	int port = 0;
 	int option = 0;
-	int controlSocket;
-	int transferSocket;
+	int controlSocket = 0;
+	int transferSocket = 0;
 
-	if(argc != 3) {
+	if(argc < 3) {
 		fprintf(stderr, "Not Enough Arguments\n");
 		fprintf(stderr, USAGE, argv[0]);
         exit(EXIT_FAILURE);
@@ -35,7 +37,10 @@ int main(int argc, char** argv)
             ipAddr = optarg;
             break;
         case 'p':
-        	port = atoi(optarg);
+        	if((port = atoi(optarg)) == 0) {
+        		fprintf(stderr, USAGE, argv[0]);
+        		exit(EXIT_FAILURE);
+        	}
         	break;
         default:
             fprintf(stderr, USAGE, argv[0]);
@@ -55,7 +60,7 @@ int main(int argc, char** argv)
 
 	printf("Connecting to control Server: %s\n", ipAddr);
 	controlSocket = initConnection(DEF_PORT, ipAddr);
-	//transferSocket = initConnection(port, ipAddr);
+	initalizeServer(&transferSocket, &port);
 	processCommand(&controlSocket, &transferSocket);
 
 	return 0;
@@ -94,13 +99,12 @@ int main(int argc, char** argv)
 -- Commands:
 -- e - exit the program
 -- l - list the available files on the server
--- r - receive a file from the server
--- s - send a file to the server
+-- 0 - receive a file from the server
+-- 1 - send a file to the server
 -- h - show a list of available commands
 */
 void processCommand(int* controlSocket, int* transferSocket)
 {
-	int numRead = 0;
 	char* cmd = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 	
 	// Print help
@@ -109,42 +113,45 @@ void processCommand(int* controlSocket, int* transferSocket)
 	while(TRUE) {
 		printf("$ ");
 		
-		if((numRead = scanf("%c%s", &(cmd[0]), (cmd + 1))) == EOF) { 
+		if(scanf("%c", &(cmd[0])) == EOF) { 
 			cmd[0] = 'e';
 		}
 		
 		switch(cmd[0]) {
 		case 'e': // exit
 			closeSocket(controlSocket);
-			closeSocket(transferSocket);
 			exit(EXIT_SUCCESS);
 		case 'l': // list files
-			listFile(controlSocket, transferSocket);
+			if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
+				systemFatal("Error sending list command\n");
+			}
+			listFile(transferSocket);
 			break;
 		case 'r': // receive file
-			if(numRead != 2) {
-				perror("Invalid Command. h for help\n");
-			} else {
-				// Send Command and file name
-				if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
-					systemFatal("Error sending receive command\n");
-				}
-				receiveFile(controlSocket, transferSocket, cmd + 1);
+			cmd[0] = '0';
+			printf("Enter Filename: ");
+			scanf("%s", cmd + 1);
+			// Send Command and file name
+			if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
+				systemFatal("Error sending receive command\n");
 			}
+			receiveFile(controlSocket, transferSocket, cmd + 1);
 			break;
 		case 's': // send file
-			if(numRead != 2) {
-				perror("Invalid Command. h for help\n");
-			} else {
-				// Send Command and file name
-				if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
-					systemFatal("Error sending send command\n");
-				}
-				sendFile(controlSocket, transferSocket, cmd + 1);
+			cmd[0] = '1';
+			printf("Enter Filename: ");
+			scanf("%s", cmd + 1);
+			// Send Command and file name
+			if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
+				systemFatal("Error sending send command\n");
 			}
+			sendFile(controlSocket, transferSocket, cmd + 1);
 			break;
 		case 'h': // show commands
 			printHelp();
+			break;
+		default:
+			printf("Invalid Command. Type h for a list of commands.\n");
 		}
 	}
 	
@@ -173,16 +180,10 @@ void processCommand(int* controlSocket, int* transferSocket)
 -- 
 -- Once the reply is received, it will be printed in order of receiving.
 */
-void listFile(int* controlSocket, int* transferSocket)
+void listFile(int* transferSocket)
 {	
-	char cmd[BUFFER_LENGTH] = "l";
 	char files[BUFFER_LENGTH];
 	int dataRead;
-	
-	// Send Command
-	if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
-		systemFatal("Error sending list command\n");
-	}
 	
 	system("clear");
 	
@@ -226,22 +227,11 @@ void listFile(int* controlSocket, int* transferSocket)
 */
 void receiveFile(int* controlSocket, int* transferSocket, const char* fileName)
 {
-	char cmd[BUFFER_LENGTH] = "r";
 	char* buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 	FILE* file = NULL;
 	off_t fileSize = 0;
 	int bytesRead = 0;
 	int count = 0;
-	
-	// Send Command
-	if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
-		systemFatal("Error sending receive command\n");
-	}
-	
-	// Send file name to receive
-	if(sendData(controlSocket, fileName, BUFFER_LENGTH) == -1) {
-		systemFatal("Error sending receive filename\n");
-	}
 	
 	readData(controlSocket, buffer, BUFFER_LENGTH);
 	bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
@@ -301,11 +291,6 @@ void sendFile(int* controlSocket, int* transferSocket, const char* fileName)
 	int file = 0;
     off_t offset = 0;
 	
-	// Send file name to receive
-	if(sendData(controlSocket, fileName, BUFFER_LENGTH) == -1) {
-		systemFatal("Error sending receive filename\n");
-	}
-	
 	if ((file = open(fileName, O_RDONLY)) == -1) {
 		fprintf(stderr, "Error opening file: %s\n", fileName);
 		return;
@@ -316,7 +301,7 @@ void sendFile(int* controlSocket, int* transferSocket, const char* fileName)
     }
 	
 	*buffer = FILE_SIZE;
-    bcopy((void*)statBuffer.st_size, buffer + 1, sizeof(off_t));
+    bcopy((void*)&statBuffer.st_size, buffer + 1, sizeof(off_t));
     sendData(controlSocket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client
@@ -358,11 +343,35 @@ void printHelp()
 	system("clear");
 	printf("Super File Transfer\n");
 	printf("l - list transferable files\n");
-	printf("r[[file name]] - receive file\n");
-	printf("s[[file name]] - send file\n");
+	printf("0 - receive file\n");
+	printf("1 - send file\n");
 	printf("h - help\n");
 	printf("e - exit\n");
 }
+
+void initalizeServer(int *listenSocket, int *port)
+{
+    // Create a TCP socket
+    if ((*listenSocket = tcpSocket()) == -1) {
+        systemFatal("Cannot Create Socket!");
+    }
+    
+    // Allow the socket to be reused immediately after exit
+    if (setReuse(&(*listenSocket)) == -1) {
+        systemFatal("Cannot Set Socket To Reuse");
+    }
+    
+    // Bind an address to the socket
+    if (bindAddress(&(*port), &(*listenSocket)) == -1) {
+        systemFatal("Cannot Bind Address To Socket");
+    }
+    
+    // Set the socket to listen for connections
+    if (setListen(&(*listenSocket)) == -1) {
+        systemFatal("Cannot Listen On Socket");
+    }
+}
+
 
 /*
 -- FUNCTION: systemFatal
