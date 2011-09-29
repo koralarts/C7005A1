@@ -97,11 +97,11 @@ void processConnection(int socket, char *ip, int port)
     {
     case GET_FILE:
         // Add 1 to buffer to move past the control byte
-        getFile(transferSocket, buffer + 1);
+        sendFile(transferSocket, buffer + 1);
         break;
     case SEND_FILE:
         // Add 1 to buffer to move past the control byte
-        sendFile(transferSocket, buffer + 1);
+        getFile(transferSocket, buffer + 1);
         break;
     case REQUEST_LIST:
         break;
@@ -158,7 +158,6 @@ void sendFile(int socket, char *fileName)
 {
     int file = 0;
     struct stat statBuffer;
-    off_t offset = 0;
     char *buffer = (char*)calloc(BUFFER_LENGTH, sizeof(char));
     
     // Open the file for reading
@@ -178,7 +177,7 @@ void sendFile(int socket, char *fileName)
     sendData(&socket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client
-    if (sendfile(socket, file, &offset, statBuffer.st_size) == -1)
+    if (sendfile(socket, file, NULL, statBuffer.st_size) == -1)
     {
         systemFatal("Unable To Send File");
     }
