@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/sendfile.h>
+#include <netinet/in.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,17 +12,15 @@
 #include <strings.h>
 #include <time.h>
 
-#define USAGE		"Usage: %s -i [ip address] -p [transfer server port]\n"
+#define USAGE		"Usage: %s -i [ip address]\n"
 #define RECEIVE		0
 #define SEND		1
 
 int main(int argc, char** argv)
 {
 	char* ipAddr = 0;
-	int port = 0;
 	int option = 0;
 	int controlSocket = 0;
-	int transferSocket = 0;
 
 	if(argc < 3) {
 		fprintf(stderr, "Not Enough Arguments\n");
@@ -29,39 +28,22 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
 	}
 
-	while((option = getopt(argc, argv, ":i:p:")) != -1)
+	while((option = getopt(argc, argv, ":i:")) != -1)
     {
         switch(option)
         {
         case 'i':
             ipAddr = optarg;
             break;
-        case 'p':
-        	if((port = atoi(optarg)) == 0) {
-        		fprintf(stderr, USAGE, argv[0]);
-        		exit(EXIT_FAILURE);
-        	}
-        	break;
         default:
             fprintf(stderr, USAGE, argv[0]);
             exit(EXIT_FAILURE);
         }
     }
-    
-    if(ipAddr == 0) {
-    	fprintf(stderr, "-i is a required switch\n");
-    	fprintf(stderr, USAGE, argv[0]);
-        exit(EXIT_FAILURE);
-    }
-    if(port == 0) {
-    	srand(time(NULL));
-    	port = rand() % 7000 + 2999;
-    }
 
 	printf("Connecting to control Server: %s\n", ipAddr);
 	controlSocket = initConnection(DEF_PORT, ipAddr);
-	initalizeServer(&transferSocket, &port);
-	processCommand(&controlSocket, &transferSocket);
+	processCommand(&controlSocket);
 
 	return 0;
 }
@@ -103,16 +85,18 @@ int main(int argc, char** argv)
 -- 1 - send a file to the server
 -- h - show a list of available commands
 */
-void processCommand(int* controlSocket, int* transferSocket)
+void processCommand(int* controlSocket)
 {
 	char* cmd = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
+	int port = getPort(controlSocket);
+	
+	printf("Port: %d", port); 
 	
 	// Print help
 	printHelp();
 	
 	while(TRUE) {
 		printf("$ ");
-		
 		if(scanf("%c", &(cmd[0])) == EOF) { 
 			cmd[0] = 'e';
 		}
@@ -123,9 +107,10 @@ void processCommand(int* controlSocket, int* transferSocket)
 			exit(EXIT_SUCCESS);
 		case 'l': // list files
 			if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
-				systemFatal("Error sending list command\n");
+				systemFatal("Error sending list command");
 			}
-			listFile(transferSocket);
+			closeSocket(controlSocket);
+			listFile(port);
 			break;
 		case 'r': // receive file
 			cmd[0] = '0';
@@ -133,20 +118,22 @@ void processCommand(int* controlSocket, int* transferSocket)
 			scanf("%s", cmd + 1);
 			// Send Command and file name
 			if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
-				systemFatal("Error sending receive command\n");
+				systemFatal("Error sending receive command");
 			}
-			receiveFile(controlSocket, transferSocket, cmd + 1);
-			break;
+			closeSocket(controlSocket);
+			receiveFile(port, cmd + 1);
+			exit(EXIT_SUCCESS);
 		case 's': // send file
 			cmd[0] = '1';
 			printf("Enter Filename: ");
 			scanf("%s", cmd + 1);
 			// Send Command and file name
 			if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
-				systemFatal("Error sending send command\n");
+				systemFatal("Error sending send command.");
 			}
-			sendFile(controlSocket, transferSocket, cmd + 1);
-			break;
+			closeSocket(controlSocket);
+			sendFile(port, cmd + 1);
+			exit(EXIT_SUCCESS);
 		case 'h': // show commands
 			printHelp();
 			break;
@@ -180,16 +167,19 @@ void processCommand(int* controlSocket, int* transferSocket)
 -- 
 -- Once the reply is received, it will be printed in order of receiving.
 */
-void listFile(int* transferSocket)
+void listFile(int port)
 {	
 	char files[BUFFER_LENGTH];
 	int dataRead;
+	int transferSocket = 0;
+	
+	initalizeServer(&transferSocket, &port);
 	
 	system("clear");
 	
 	while(TRUE) {
 		// Receive File List
-		dataRead = readData(transferSocket, files, FILENAME_MAX);
+		dataRead = readData(&transferSocket, files, FILENAME_MAX);
 		if(dataRead <= 0) {
 			break;
 		}
@@ -225,15 +215,18 @@ void listFile(int* transferSocket)
 -- Once all the contents of the file are received and written to a file, the
 -- program will print out a success message.
 */
-void receiveFile(int* controlSocket, int* transferSocket, const char* fileName)
+void receiveFile(int port, const char* fileName)
 {
 	char* buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 	FILE* file = NULL;
 	off_t fileSize = 0;
 	int bytesRead = 0;
 	int count = 0;
+	int transferSocket = 0;
 	
-	readData(transferSocket, buffer, BUFFER_LENGTH);
+	initalizeServer(&transferSocket, &port);
+	
+	readData(&transferSocket, buffer, BUFFER_LENGTH);
 	bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
 	
 	if((file = fopen(fileName, "wb")) == NULL) {
@@ -242,12 +235,12 @@ void receiveFile(int* controlSocket, int* transferSocket, const char* fileName)
 	}
 	
 	while (count < (fileSize - BUFFER_LENGTH)) {
-        bytesRead = readData(transferSocket, buffer, BUFFER_LENGTH);
+        bytesRead = readData(&transferSocket, buffer, BUFFER_LENGTH);
         fwrite(buffer, sizeof(char), bytesRead, file);
         count += bytesRead;
     }
 	
-	bytesRead = readData(transferSocket, buffer, fileSize - count);
+	bytesRead = readData(&transferSocket, buffer, fileSize - count);
     fwrite(buffer, sizeof(char), bytesRead, file);
 	
 	fclose(file);
@@ -284,12 +277,15 @@ void receiveFile(int* controlSocket, int* transferSocket, const char* fileName)
 -- Once all the contents of the file are received and written to a file, the
 -- program will print out a success message.
 */
-void sendFile(int* controlSocket, int* transferSocket, const char* fileName)
+void sendFile(int port, const char* fileName)
 {
 	struct stat statBuffer;
 	char* buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 	int file = 0;
     off_t offset = 0;
+    int transferSocket = 0;
+	
+	initalizeServer(&transferSocket, &port);
 	
 	if ((file = open(fileName, O_RDONLY)) == -1) {
 		fprintf(stderr, "Error opening file: %s\n", fileName);
@@ -301,10 +297,10 @@ void sendFile(int* controlSocket, int* transferSocket, const char* fileName)
     }
 
     bcopy((void*)&statBuffer.st_size, buffer, sizeof(off_t));
-    sendData(transferSocket, buffer, BUFFER_LENGTH);
+    sendData(&transferSocket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client
-    if (sendfile(*transferSocket, file, &offset, statBuffer.st_size) == -1) {
+    if (sendfile(transferSocket, file, &offset, statBuffer.st_size) == -1) {
         fprintf(stderr, "Error sending %s\n", fileName);
     }
     
@@ -342,13 +338,13 @@ void printHelp()
 	system("clear");
 	printf("Super File Transfer\n");
 	printf("l - list transferable files\n");
-	printf("0 - receive file\n");
-	printf("1 - send file\n");
+	printf("r - receive file\n");
+	printf("s - send file\n");
 	printf("h - help\n");
 	printf("e - exit\n");
 }
 
-void initalizeServer(int *listenSocket, int *port)
+void initalizeServer(int* listenSocket, int* port)
 {
     // Create a TCP socket
     if ((*listenSocket = tcpSocket()) == -1) {
@@ -361,7 +357,7 @@ void initalizeServer(int *listenSocket, int *port)
     }
     
     // Bind an address to the socket
-    if (bindAddress(&(*port), &(*listenSocket)) == -1) {
+    if (bindAddress(port, listenSocket) == -1) {
         systemFatal("Cannot Bind Address To Socket");
     }
     
@@ -369,6 +365,16 @@ void initalizeServer(int *listenSocket, int *port)
     if (setListen(&(*listenSocket)) == -1) {
         systemFatal("Cannot Listen On Socket");
     }
+}
+
+int getPort(int* socket)
+{
+	struct sockaddr_in sin;
+	socklen_t len = sizeof(sin);
+	if (getsockname(*socket, (struct sockaddr *)&sin, &len) == -1) {
+		systemFatal("getsockname Error\n");
+	}
+	return ntohs(sin.sin_port);
 }
 
 

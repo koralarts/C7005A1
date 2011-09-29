@@ -46,6 +46,7 @@ void server(int port)
         }
 
         // Spawn process to deal with client
+        printf("%u", *clientPort);
         processId = fork();
         if (processId == 0)
         {
