@@ -30,7 +30,7 @@ void server(int port)
     int socket = 0;
     int processId = 0;
     char clientIp[16];
-    unsigned short *clientPort = (unsigned short*)malloc(sizeof(unsigned short));
+    unsigned short *clientPort = NULL;
     
     // Set up the server
     initializeServer(&listenSocket, &port);
@@ -38,6 +38,7 @@ void server(int port)
     // Loop to monitor the server socket
     while (1)
     {
+        clientPort = (unsigned short*)malloc(sizeof(unsigned short));
         // Block here and wait for new connections
         if ((socket = acceptConnectionIpPort(&listenSocket, clientIp,
             clientPort)) == -1)
@@ -53,12 +54,14 @@ void server(int port)
             // Process the child connection
             processConnection(socket, clientIp, (int)*clientPort);
             // Once we are done, exit
+            free(clientPort);
             return;
         }
         else if (processId > 0)
         {
             // Since I am the parent, keep on going
             close(socket);
+            free(clientPort);
             continue;
         }
         else
