@@ -20,7 +20,7 @@
 
 void initializeServer(int *listenSocket, int *port);
 void createTransferSocket(int *socket);
-void processConnection(int socket, char *ip, unsigned short port);
+void processConnection(int socket, char *ip, int port);
 void getFile(int socket, char *fileName);
 void sendFile(int socket, char *fileName);
 static void systemFatal(const char* message);
@@ -29,7 +29,6 @@ void server(int port)
 {
     int listenSocket = 0;
     int socket = 0;
-    int transferSocket = 0;
     int processId = 0;
     char clientIp[16];
     unsigned short *clientPort = 0;
@@ -37,11 +36,7 @@ void server(int port)
     // Set up the server
     initializeServer(&listenSocket, &port);
     
-    // Set up the transfer socket
-    createTransferSocket(&transferSocket);
-    
     // Loop to monitor the server socket
-    printf("waiting for clients\n");
     while (1)
     {
         // Block here and wait for new connections
@@ -57,9 +52,8 @@ void server(int port)
         {
             close(listenSocket);
             // Process the child connection
-            processConnection(socket, clientIp, *clientPort);
+            processConnection(socket, clientIp, (int)*clientPort);
             // Once we are done, exit
-            close(socket);
             return;
         }
         else if (processId > 0)
@@ -78,53 +72,40 @@ void server(int port)
     printf("Server Closing!\n");
 }
 
-void processConnection(int socket, char *ip, unsigned short port)
+void processConnection(int socket, char *ip, int port)
 {
+    int transferSocket = 0;
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 
     // Read data from the client
     while (1)
     {
         readData(&socket, buffer, BUFFER_LENGTH);
-
+        
+        // Close the command socket
+        close(socket);
+        
+        // Connect to the client
+        createTransferSocket(&transferSocket);
+        if (connectToServer(&port, &transferSocket, ip) == -1)
+        {
+            systemFatal("Unable To Connect To Client");
+        }
+        
         switch (buffer[0])
         {
         case GET_FILE:
             // Add 1 to buffer to move past the control byte
-            getFile(socket, buffer + 1);
+            getFile(transferSocket, buffer + 1);
             break;
         case SEND_FILE:
             // Add 1 to buffer to move past the control byte
-            sendFile(socket, buffer + 1);
+            sendFile(transferSocket, buffer + 1);
             break;
         case REQUEST_LIST:
             break;
         }
     }
-}
-
-int initConnection(int port, const char* ip) 
-{
-	int socket = 0;
-	
-	// Create socket
-	if((socket = tcpSocket()) == -1) {
-		systemFatal("Error Creating Socket\n");
-	}
-
-	// Set socket to reuse
-	if(setReuse(&socket) == -1) {
-		systemFatal("Error Set Socket Reuse\n");
-	}
-	
-	// Bind the socket to our send port
-	
-	// Connect to transfer server
-	if(connectToServer(&port, &socket, ip) == -1) {
-		systemFatal("Cannot Connect to server\n");
-	}
-	
-	return socket;
 }
 
 void getFile(int socket, char *fileName)
