@@ -55,7 +55,7 @@ int main(int argc, char** argv)
 
 	printf("Connecting to control Server: %s\n", ipAddr);
 	controlSocket = initConnection(DEF_PORT, ipAddr);
-	transferSocket = initConnection(port, ipAddr);
+	//transferSocket = initConnection(port, ipAddr);
 	processCommand(&controlSocket, &transferSocket);
 
 	return 0;

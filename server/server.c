@@ -16,9 +16,11 @@
 #define SEND_FILE 1
 #define REQUEST_LIST 2
 #define FILE_SIZE 3
+#define TRANSFER_PORT 7000
 
 void initializeServer(int *listenSocket, int *port);
-void processConnection(int socket);
+void createTransferSocket(int *socket);
+void processConnection(int socket, char *ip, unsigned short port);
 void getFile(int socket, char *fileName);
 void sendFile(int socket, char *fileName);
 static void systemFatal(const char* message);
@@ -27,26 +29,35 @@ void server(int port)
 {
     int listenSocket = 0;
     int socket = 0;
+    int transferSocket = 0;
     int processId = 0;
+    char clientIp[16];
+    unsigned short *clientPort = 0;
     
     // Set up the server
     initializeServer(&listenSocket, &port);
     
+    // Set up the transfer socket
+    createTransferSocket(&transferSocket);
+    
     // Loop to monitor the server socket
+    printf("waiting for clients\n");
     while (1)
     {
         // Block here and wait for new connections
-        if ((socket = acceptConnection(&listenSocket)) == -1)
+        if ((socket = acceptConnectionIpPort(&listenSocket, clientIp,
+            clientPort)) == -1)
         {
             systemFatal("Can't Accept Client");
         }
-        printf("New Client!");
+
         // Spawn process to deal with client
+        processId = fork();
         if (processId == 0)
         {
             close(listenSocket);
             // Process the child connection
-            processConnection(socket);
+            processConnection(socket, clientIp, *clientPort);
             // Once we are done, exit
             close(socket);
             return;
@@ -67,10 +78,10 @@ void server(int port)
     printf("Server Closing!\n");
 }
 
-void processConnection(int socket)
+void processConnection(int socket, char *ip, unsigned short port)
 {
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
-    
+
     // Read data from the client
     while (1)
     {
@@ -90,6 +101,30 @@ void processConnection(int socket)
             break;
         }
     }
+}
+
+int initConnection(int port, const char* ip) 
+{
+	int socket = 0;
+	
+	// Create socket
+	if((socket = tcpSocket()) == -1) {
+		systemFatal("Error Creating Socket\n");
+	}
+
+	// Set socket to reuse
+	if(setReuse(&socket) == -1) {
+		systemFatal("Error Set Socket Reuse\n");
+	}
+	
+	// Bind the socket to our send port
+	
+	// Connect to transfer server
+	if(connectToServer(&port, &socket, ip) == -1) {
+		systemFatal("Cannot Connect to server\n");
+	}
+	
+	return socket;
 }
 
 void getFile(int socket, char *fileName)
@@ -169,7 +204,7 @@ void sendFile(int socket, char *fileName)
     free(buffer);
 }
 
-
+/*
 void getFileList(char *buffer)
 {
     int index = 0;
@@ -182,6 +217,33 @@ void getFileList(char *buffer)
     }
     
     closedir(mydir);
+}
+*/
+
+void createTransferSocket(int *socket)
+{
+    int *defaultPort = malloc(sizeof(int));
+    *defaultPort = TRANSFER_PORT;
+    
+    // Create a TCP socket
+    if ((*socket = tcpSocket()) == -1)
+    {
+        systemFatal("Cannot Create Socket!");
+    }
+    
+    // Allow the socket to be reused immediately after exit
+    if (setReuse(socket) == -1)
+    {
+        systemFatal("Cannot Set Socket To Reuse");
+    }
+    
+    // Bind an address to the socket
+    if (bindAddress(defaultPort, socket) == -1)
+    {
+        systemFatal("Cannot Bind Address To Socket");
+    }
+    
+    free(defaultPort);
 }
 
 /*
