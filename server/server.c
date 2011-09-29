@@ -78,34 +78,36 @@ void processConnection(int socket, char *ip, int port)
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 
     // Read data from the client
-    while (1)
+
+    readData(&socket, buffer, BUFFER_LENGTH);
+    
+    // Close the command socket
+    close(socket);
+    
+    // Connect to the client
+    createTransferSocket(&transferSocket);
+    if (connectToServer(&port, &transferSocket, ip) == -1)
     {
-        readData(&socket, buffer, BUFFER_LENGTH);
-        
-        // Close the command socket
-        close(socket);
-        
-        // Connect to the client
-        createTransferSocket(&transferSocket);
-        if (connectToServer(&port, &transferSocket, ip) == -1)
-        {
-            systemFatal("Unable To Connect To Client");
-        }
-        
-        switch (buffer[0])
-        {
-        case GET_FILE:
-            // Add 1 to buffer to move past the control byte
-            getFile(transferSocket, buffer + 1);
-            break;
-        case SEND_FILE:
-            // Add 1 to buffer to move past the control byte
-            sendFile(transferSocket, buffer + 1);
-            break;
-        case REQUEST_LIST:
-            break;
-        }
+        systemFatal("Unable To Connect To Client");
     }
+    
+    switch (buffer[0])
+    {
+    case GET_FILE:
+        // Add 1 to buffer to move past the control byte
+        getFile(transferSocket, buffer + 1);
+        break;
+    case SEND_FILE:
+        // Add 1 to buffer to move past the control byte
+        sendFile(transferSocket, buffer + 1);
+        break;
+    case REQUEST_LIST:
+        break;
+    }
+    
+    // Free local variables and sockets
+    free(buffer);
+    close(transferSocket);
 }
 
 void getFile(int socket, char *fileName)
