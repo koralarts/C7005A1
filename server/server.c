@@ -171,7 +171,7 @@ void sendFile(int socket, char *fileName)
     
     // Send a control message with the size of the file
     *buffer = FILE_SIZE;
-    bcopy((void*)statBuffer.st_size, buffer + 1, sizeof(off_t));
+    bcopy((void*)&statBuffer.st_size, buffer + 1, sizeof(off_t));
     sendData(&socket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client
