@@ -15,7 +15,6 @@
 #define GET_FILE 0
 #define SEND_FILE 1
 #define REQUEST_LIST 2
-#define FILE_SIZE 3
 #define TRANSFER_PORT 7000
 
 void initializeServer(int *listenSocket, int *port);
@@ -170,8 +169,7 @@ void sendFile(int socket, char *fileName)
     }
     
     // Send a control message with the size of the file
-    *buffer = FILE_SIZE;
-    bcopy((void*)&statBuffer.st_size, buffer + 1, sizeof(off_t));
+    bcopy((void*)&statBuffer.st_size, buffer, sizeof(off_t));
     sendData(&socket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client
