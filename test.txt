@@ -9,10 +9,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-void processCommand(int* controlSocket, int* transferSocket);
-void listFile(int* transferSocket);
-void receiveFile(int* controlSocket, int* transferSocket, const char* fileName);
-void sendFile(int* controlSocket, int* transferSocket, const char* fileName);
+void processCommand(int* controlSocket, int port);
+void listFile(int port);
+void receiveFile(int* controlSocket, int port, const char* fileName);
+void sendFile(int* controlSocket, int port, const char* fileName);
 
 // Helper functions
 int initConnection(int port, const char* ip);
