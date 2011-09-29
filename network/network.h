@@ -15,6 +15,7 @@ int bindAddress(int *port, int *socket);
 int setListen(int *socket);
 int acceptConnection(int *listenSocket);
 int acceptConnectionIp(int *listenSocket, char* ip);
+int acceptConnectionPort(int *listenSocket, unsigned short *port);
 int readData(int *socket, char *buffer, int bytesToRead);
 int sendData(int *socket, const char *buffer, int bytesToSend);
 int closeSocket(int *socket);
