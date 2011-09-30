@@ -97,15 +97,16 @@ void processConnection(int socket, char *ip, int port)
     
     switch ((int)buffer[0])
     {
-    case SEND_FILE:
+    case GET_FILE:
         // Add 1 to buffer to move past the control byte
         printf("Sending %s to client now...\n", buffer + 1);
         sendFile(transferSocket, buffer + 1);
         break;
-    case GET_FILE:
+    case SEND_FILE:
         // Add 1 to buffer to move past the control byte
         printf("Getting %s from client now...\n", buffer + 1);
         getFile(transferSocket, buffer + 1);
+        printf("Getting %s successful.\n", buffer + 1);
         break;
     case REQUEST_LIST:
         break;
@@ -126,14 +127,11 @@ void getFile(int socket, char *fileName)
     FILE *file = NULL;
     char* fileNamePath = (char*)malloc(sizeof(char) * FILENAME_MAX);
     
-    printf("File name: %s\n", fileName);
     // Get the control packet with the file size
     readData(&socket, buffer, BUFFER_LENGTH);
-    printf("File size: %s\n", buffer);
     
     // Retrieve file size from the buffer
     bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
-    printf("File size is %zd", fileSize);
     
     // Open the file
     sprintf(fileNamePath, "%s%s", DEF_DIR, fileName);
@@ -143,7 +141,7 @@ void getFile(int socket, char *fileName)
     {
         systemFatal("Unable To Create File");
     }
-    
+
     // Read from the socket and write the file to disk
     while (count < (fileSize - BUFFER_LENGTH))
     {

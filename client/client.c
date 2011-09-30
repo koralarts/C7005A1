@@ -15,6 +15,7 @@
 #define USAGE		"Usage: %s -i [ip address]\n"
 #define RECEIVE		0
 #define SEND		1
+#define DEF_DIR "./share/"
 
 int main(int argc, char** argv)
 {
@@ -226,13 +227,17 @@ void receiveFile(int port, const char* fileName)
 	int bytesRead = 0;
 	int count = 0;
 	int transferSocket = 0;
+	char* fileNamePath = (char*)malloc(sizeof(char) * FILENAME_MAX);
 	
 	initalizeServer(&transferSocket, &port);
 	
 	readData(&transferSocket, buffer, BUFFER_LENGTH);
 	bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
 	
-	if((file = fopen(fileName, "wb")) == NULL) {
+	sprintf(fileNamePath, "%s%s", DEF_DIR, fileName);
+    printf("%s", fileNamePath);
+	
+	if((file = fopen(fileNamePath, "wb")) == NULL) {
 		fprintf(stderr, "Error opening file: %s\n", fileName);
 		return;
 	}
@@ -290,8 +295,6 @@ void sendFile(int port, const char* fileName)
 	
 	initalizeServer(&transferSocket, &port);
 	
-	printf("Connected to server and sending %s", fileName);
-	
 	if ((file = open(fileName, O_RDONLY)) == -1) {
 		fprintf(stderr, "Error opening file: %s\n", fileName);
 		return;
@@ -304,6 +307,7 @@ void sendFile(int port, const char* fileName)
     bcopy((void*)&statBuffer.st_size, buffer, sizeof(off_t));
     sendData(&transferSocket, buffer, BUFFER_LENGTH);
     
+    printf("Connected to server and sending %s\n", fileName);
     // Send the file to the client
     if (sendfile(transferSocket, file, &offset, statBuffer.st_size) == -1) {
         fprintf(stderr, "Error sending %s\n", fileName);
@@ -345,6 +349,7 @@ void printHelp()
 	printf("l - list transferable files\n");
 	printf("r - receive file\n");
 	printf("s - send file\n");
+	printf("f - print local files\n");
 	printf("h - help\n");
 	printf("e - exit\n");
 }
