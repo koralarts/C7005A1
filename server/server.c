@@ -82,7 +82,7 @@ void processConnection(int socket, char *ip, int port)
 
     // Read data from the client
     readData(&socket, buffer, BUFFER_LENGTH);
-    
+    printf("Filename is %s and the command is %d\n", buffer + 1, buffer[0]);
     // Close the command socket
     close(socket);
     
@@ -92,7 +92,7 @@ void processConnection(int socket, char *ip, int port)
     {
         systemFatal("Unable To Connect To Client");
     }
-    printf("Filename is %s and the command is %d\n", buffer + 1, buffer[0]);
+    
     printf("Connected to Client: %s\n", ip);
     
     switch ((int)buffer[0])
@@ -130,6 +130,7 @@ void getFile(int socket, char *fileName)
     
     // Retrieve file size from the buffer
     bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
+    printf("File size is %zd", fileSize);
     
     // Open the file
     file = fopen(fileName, "wb");
