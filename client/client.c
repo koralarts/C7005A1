@@ -11,6 +11,7 @@
 #include <dirent.h>
 #include <strings.h>
 #include <time.h>
+#include <string.h>
 
 #define USAGE		"Usage: %s -i [ip address]\n"
 #define RECEIVE		0
@@ -293,22 +294,23 @@ void sendFile(int port, const char* fileName)
 	printf("Connected to server and sending %s", fileName);
 	
 	if ((file = open(fileName, O_RDONLY)) == -1) {
-		fprintf(stderr, "Error opening file: %s\n", fileName);
-		return;
+        systemFatal("Unable To Open File");
 	}
 	
 	if (fstat(file, &statBuffer) == -1) {
         systemFatal("Error Getting File Information");
     }
 
-    bcopy((void*)&statBuffer.st_size, buffer, sizeof(off_t));
-    sendData(&transferSocket, buffer, BUFFER_LENGTH);
+    memmove(buffer, (void*)&statBuffer.st_size, sizeof(off_t));
     
+    sendData(&transferSocket, buffer, BUFFER_LENGTH);
+    /*
+
     // Send the file to the client
     if (sendfile(transferSocket, file, &offset, statBuffer.st_size) == -1) {
         fprintf(stderr, "Error sending %s\n", fileName);
     }
-    
+    */
     // Close the file
     close(file);
     free(buffer);
