@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <dirent.h>
 #include <strings.h>
+#include <string.h>
 
 #include "server.h"
 #include "../network/network.h"
@@ -131,11 +132,11 @@ void getFile(int socket, char *fileName)
     readData(&socket, buffer, BUFFER_LENGTH);
     
     // Retrieve file size from the buffer
-    bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
+    memmove((void*)&fileSize, buffer, sizeof(off_t));
+    printf("File size is %zd", fileSize);
     
     // Open the file
     sprintf(fileNamePath, "%s%s", DEF_DIR, fileName);
-    printf("%s", fileNamePath);
     file = fopen(fileNamePath, "wb");
     if (file == NULL)
     {
@@ -145,11 +146,13 @@ void getFile(int socket, char *fileName)
     // Read from the socket and write the file to disk
     while (count < (fileSize - BUFFER_LENGTH))
     {
+    	printf("Inside While");
         bytesRead = readData(&socket, buffer, BUFFER_LENGTH);
         fwrite(buffer, sizeof(char), bytesRead, file);
         count += bytesRead;
     }
     
+    printf("Outside While");
     // Retrieve any left over data and write it out
     bytesRead = readData(&socket, buffer, fileSize - count);
     fwrite(buffer, sizeof(char), bytesRead, file);
@@ -182,7 +185,7 @@ void sendFile(int socket, char *fileName)
     }
     
     // Send a control message with the size of the file
-    bcopy((void*)&statBuffer.st_size, buffer, sizeof(off_t));
+    memmove(buffer, (void*)&statBuffer.st_size, sizeof(off_t));
     sendData(&socket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client

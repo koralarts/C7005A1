@@ -2,6 +2,7 @@
 bin/*
 object/*
 debug/*
+share/*
 
 # Compiled Object files
 *.slo

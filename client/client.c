@@ -11,6 +11,7 @@
 #include <dirent.h>
 #include <strings.h>
 #include <time.h>
+#include <string.h>
 
 #define USAGE		"Usage: %s -i [ip address]\n"
 #define RECEIVE		0
@@ -177,7 +178,7 @@ void listFile(int port)
 	int dataRead;
 	int transferSocket = 0;
 	
-	initalizeServer(&transferSocket, &port);
+	//initalizeServer(&transferSocket, &port);
 	
 	system("clear");
 	
@@ -229,7 +230,7 @@ void receiveFile(int port, const char* fileName)
 	int transferSocket = 0;
 	char* fileNamePath = (char*)malloc(sizeof(char) * FILENAME_MAX);
 	
-	initalizeServer(&transferSocket, &port);
+	transferSocket = initalizeServer(&port);
 	
 	readData(&transferSocket, buffer, BUFFER_LENGTH);
 	bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
@@ -288,28 +289,30 @@ void receiveFile(int port, const char* fileName)
 void sendFile(int port, const char* fileName)
 {
 	struct stat statBuffer;
-	char* buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
+	char *buffer = (char*)calloc(BUFFER_LENGTH, sizeof(char));
 	int file = 0;
-    off_t offset = 0;
     int transferSocket = 0;
 	
-	initalizeServer(&transferSocket, &port);
+	transferSocket = initalizeServer(&port);
 	
 	if ((file = open(fileName, O_RDONLY)) == -1) {
-		fprintf(stderr, "Error opening file: %s\n", fileName);
-		return;
+        systemFatal("Unable To Open File");
 	}
 	
 	if (fstat(file, &statBuffer) == -1) {
         systemFatal("Error Getting File Information");
     }
 
-    bcopy((void*)&statBuffer.st_size, buffer, sizeof(off_t));
-    sendData(&transferSocket, buffer, BUFFER_LENGTH);
+    memmove(buffer, (void*)&statBuffer.st_size, sizeof(off_t));
     
     printf("Connected to server and sending %s\n", fileName);
+    if (sendData(&transferSocket, buffer, BUFFER_LENGTH) == -1)
+    {
+        systemFatal("Send Failed");
+    }
+    
     // Send the file to the client
-    if (sendfile(transferSocket, file, &offset, statBuffer.st_size) == -1) {
+    if (sendfile(transferSocket, file, NULL, statBuffer.st_size) == -1) {
         fprintf(stderr, "Error sending %s\n", fileName);
     }
     
@@ -354,9 +357,10 @@ void printHelp()
 	printf("e - exit\n");
 }
 
-void initalizeServer(int* socket, int* port)
+int initalizeServer(int *port)
 {
     int sock = 0;
+    int socket = 0;
     // Create a TCP socket
     if ((sock = tcpSocket()) == -1) {
         systemFatal("Cannot Create Socket!");
@@ -377,9 +381,11 @@ void initalizeServer(int* socket, int* port)
         systemFatal("Cannot Listen On Socket");
     }
     
-    if((*socket = acceptConnection(&sock) == -1)) {
+    if((socket = acceptConnection(&sock)) == -1) {
     	systemFatal("Cannot Accept on Socket");
     }
+    close(sock);
+    return socket;
 }
 
 int getPort(int* socket)

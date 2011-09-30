@@ -287,7 +287,7 @@ int readData(int *socket, char *buffer, int bytesToRead)
 */
 int sendData(int *socket, const char *buffer, int bytesToSend)
 {
-    return write(*socket, buffer, bytesToSend);
+    return send(*socket, buffer, bytesToSend, 0);
 }
 
 /*
