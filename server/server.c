@@ -133,6 +133,7 @@ void getFile(int socket, char *fileName)
     
     // Retrieve file size from the buffer
     memmove((void*)&fileSize, buffer, sizeof(off_t));
+    printf("File size is %zd\n", fileSize);
     
     // Open the file
     sprintf(fileNamePath, "%s%s", DEF_DIR, fileName);
@@ -146,12 +147,14 @@ void getFile(int socket, char *fileName)
     while (count < (fileSize - BUFFER_LENGTH))
     {
         bytesRead = readData(&socket, buffer, BUFFER_LENGTH);
+        printf("Got %d bytes...\n", bytesRead);
         fwrite(buffer, sizeof(char), bytesRead, file);
         count += bytesRead;
     }
     
     // Retrieve any left over data and write it out
     bytesRead = readData(&socket, buffer, fileSize - count);
+    printf("Got %d bytes...\n", bytesRead);
     fwrite(buffer, sizeof(char), bytesRead, file);
 
     // Close the file

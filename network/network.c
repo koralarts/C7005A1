@@ -257,13 +257,7 @@ int acceptConnectionIpPort(int *listenSocket, char *ip, unsigned short *port)
 */
 int readData(int *socket, char *buffer, int bytesToRead)
 {
-    int bytesRead = 0;
-    while ((bytesRead = read(*socket, buffer, bytesToRead)) > 0)
-    {
-        buffer += bytesRead;
-        bytesToRead -= bytesRead;
-    }
-    return bytesRead;
+    return recv(*socket, buffer, bytesToRead, 0);
 }
 
 /*
