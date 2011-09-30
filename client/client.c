@@ -284,10 +284,12 @@ void receiveFile(int port, const char* fileName)
 void sendFile(int port, const char* fileName)
 {
 	struct stat statBuffer;
-	char* buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
+	char *buffer = (char*)calloc(BUFFER_LENGTH, sizeof(char));
 	int file = 0;
     off_t offset = 0;
     int transferSocket = 0;
+    
+    off_t fileSize = 0;
 	
 	initalizeServer(&transferSocket, &port);
 	
