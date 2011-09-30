@@ -47,7 +47,7 @@ void server(int port)
         }
 
         // Spawn process to deal with client
-        printf("%u", *clientPort);
+        printf("Client Port: %u\n", *clientPort);
         processId = fork();
         if (processId == 0)
         {
@@ -81,7 +81,6 @@ void processConnection(int socket, char *ip, int port)
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 
     // Read data from the client
-
     readData(&socket, buffer, BUFFER_LENGTH);
     
     // Close the command socket
@@ -93,15 +92,19 @@ void processConnection(int socket, char *ip, int port)
     {
         systemFatal("Unable To Connect To Client");
     }
+    printf("Filename is %s and the command is %d\n", buffer + 1, buffer[0]);
+    printf("Connected to Client: %s\n", ip);
     
-    switch (buffer[0])
+    switch ((int)buffer[0])
     {
     case GET_FILE:
         // Add 1 to buffer to move past the control byte
+        printf("Sending %s to client now...\n", buffer + 1);
         sendFile(transferSocket, buffer + 1);
         break;
     case SEND_FILE:
         // Add 1 to buffer to move past the control byte
+        printf("Getting %s from client now...\n", buffer + 1);
         getFile(transferSocket, buffer + 1);
         break;
     case REQUEST_LIST:
@@ -109,6 +112,7 @@ void processConnection(int socket, char *ip, int port)
     }
     
     // Free local variables and sockets
+    printf("Closing client connection\n");
     free(buffer);
     close(transferSocket);
 }
