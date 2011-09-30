@@ -252,8 +252,7 @@ int acceptConnectionIpPort(int *listenSocket, char *ip, unsigned short *port)
 -- This is the wrapper function for reading data from a socket. The data is
 -- stored in a char array. The function will continue to read until it has read
 -- the number of bytes specified by bytesToRead. You MUST ensure that the sender
--- has sent the SAME number of bytes, or this function will block. This is due
--- to the fact that we are using read() and not recv().
+-- has sent the SAME number of bytes, or this function will block.
 */
 int readData(int *socket, char *buffer, int bytesToRead)
 {
