@@ -16,7 +16,7 @@ void sendFile(int port, const char* fileName);
 
 // Helper functions
 int initConnection(int port, const char* ip);
-void initalizeServer(int *listenSocket, int *port);
+void initalizeServer(int *socket, int *port);
 void printHelp();
 int getPort(int* socket);
 static void systemFatal(const char* message);

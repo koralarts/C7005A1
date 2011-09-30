@@ -177,7 +177,7 @@ void listFile(int port)
 	int dataRead;
 	int transferSocket = 0;
 	
-	initalizeServer(&transferSocket, &port);
+	//initalizeServer(&transferSocket, &port);
 	
 	system("clear");
 	
@@ -286,10 +286,7 @@ void sendFile(int port, const char* fileName)
 	struct stat statBuffer;
 	char *buffer = (char*)calloc(BUFFER_LENGTH, sizeof(char));
 	int file = 0;
-    off_t offset = 0;
     int transferSocket = 0;
-    
-    off_t fileSize = 0;
 	
 	initalizeServer(&transferSocket, &port);
 	
@@ -305,11 +302,15 @@ void sendFile(int port, const char* fileName)
 
     memmove(buffer, (void*)&statBuffer.st_size, sizeof(off_t));
     
-    sendData(&transferSocket, buffer, BUFFER_LENGTH);
+    if (sendData(&transferSocket, buffer, BUFFER_LENGTH) == -1)
+    {
+        systemFatal("Send Failed");
+    }
+    printf("\nThis is what we sent:\n%s\n", buffer);
     /*
 
     // Send the file to the client
-    if (sendfile(transferSocket, file, &offset, statBuffer.st_size) == -1) {
+    if (sendfile(transferSocket, file, NULL, statBuffer.st_size) == -1) {
         fprintf(stderr, "Error sending %s\n", fileName);
     }
     */
@@ -353,7 +354,7 @@ void printHelp()
 	printf("e - exit\n");
 }
 
-void initalizeServer(int* socket, int* port)
+void initalizeServer(int *socket, int *port)
 {
     int sock = 0;
     // Create a TCP socket
@@ -379,6 +380,7 @@ void initalizeServer(int* socket, int* port)
     if((*socket = acceptConnection(&sock) == -1)) {
     	systemFatal("Cannot Accept on Socket");
     }
+    close(sock);
 }
 
 int getPort(int* socket)
