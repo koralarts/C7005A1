@@ -113,6 +113,7 @@ void processCommand(int* controlSocket)
 			listFile(port);
 			break;
 		case 'r': // receive file
+			cmd[0] = (char)0;
 			printf("Enter Filename: ");
 			scanf("%s", cmd + 1);
 			// Send Command and file name
@@ -123,6 +124,7 @@ void processCommand(int* controlSocket)
 			receiveFile(port, cmd + 1);
 			exit(EXIT_SUCCESS);
 		case 's': // send file
+			cmd[0] = (char)1;
 			printf("Enter Filename: ");
 			scanf("%s", cmd + 1);
 			// Send Command and file name
@@ -288,6 +290,8 @@ void sendFile(int port, const char* fileName)
 	
 	initalizeServer(&transferSocket, &port);
 	
+	printf("Connected to server and sending %s", fileName);
+	
 	if ((file = open(fileName, O_RDONLY)) == -1) {
 		fprintf(stderr, "Error opening file: %s\n", fileName);
 		return;
@@ -347,27 +351,28 @@ void printHelp()
 
 void initalizeServer(int* socket, int* port)
 {
+    int sock = 0;
     // Create a TCP socket
-    if ((*socket = tcpSocket()) == -1) {
+    if ((sock = tcpSocket()) == -1) {
         systemFatal("Cannot Create Socket!");
     }
     
     // Allow the socket to be reused immediately after exit
-    if (setReuse(&(*socket)) == -1) {
+    if (setReuse(&sock) == -1) {
         systemFatal("Cannot Set Socket To Reuse");
     }
     
     // Bind an address to the socket
-    if (bindAddress(port, socket) == -1) {
+    if (bindAddress(port, &sock) == -1) {
         systemFatal("Cannot Bind Address To Socket");
     }
     
     // Set the socket to listen for connections
-    if (setListen(&(*socket)) == -1) {
+    if (setListen(&sock) == -1) {
         systemFatal("Cannot Listen On Socket");
     }
     
-    if(acceptConnection(&(*socket)) == -1) {
+    if((*socket = acceptConnection(&sock) == -1)) {
     	systemFatal("Cannot Accept on Socket");
     }
 }

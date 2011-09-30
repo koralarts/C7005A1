@@ -12,6 +12,8 @@
 #include "server.h"
 #include "../network/network.h"
 
+#define GET_FILE 0
+#define SEND_FILE 1
 #define REQUEST_LIST 2
 #define TRANSFER_PORT 7000
 #define DEF_DIR "./share/"
@@ -79,9 +81,8 @@ void processConnection(int socket, char *ip, int port)
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 
     // Read data from the client
-
     readData(&socket, buffer, BUFFER_LENGTH);
-    
+    printf("Filename is %s and the command is %d\n", buffer + 1, buffer[0]);
     // Close the command socket
     close(socket);
     
@@ -92,14 +93,18 @@ void processConnection(int socket, char *ip, int port)
         systemFatal("Unable To Connect To Client");
     }
     
-    switch (buffer[0])
+    printf("Connected to Client: %s\n", ip);
+    
+    switch ((int)buffer[0])
     {
-    case 'r':
+    case SEND_FILE:
         // Add 1 to buffer to move past the control byte
+        printf("Sending %s to client now...\n", buffer + 1);
         sendFile(transferSocket, buffer + 1);
         break;
-    case 's':
+    case GET_FILE:
         // Add 1 to buffer to move past the control byte
+        printf("Getting %s from client now...\n", buffer + 1);
         getFile(transferSocket, buffer + 1);
         break;
     case REQUEST_LIST:
@@ -107,6 +112,7 @@ void processConnection(int socket, char *ip, int port)
     }
     
     // Free local variables and sockets
+    printf("Closing client connection\n");
     free(buffer);
     close(transferSocket);
 }
@@ -127,6 +133,7 @@ void getFile(int socket, char *fileName)
     
     // Retrieve file size from the buffer
     bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
+    printf("File size is %zd", fileSize);
     
     // Open the file
     sprintf(fileNamePath, "%s%s", DEF_DIR, fileName);
