@@ -302,12 +302,10 @@ void sendFile(int port, const char* fileName)
 	if (fstat(file, &statBuffer) == -1) {
         systemFatal("Error Getting File Information");
     }
-
     memmove(buffer, (void*)&statBuffer.st_size, sizeof(off_t));
     
     printf("Connected to server and sending %s\n", fileName);
-    if (sendData(&transferSocket, buffer, BUFFER_LENGTH) == -1)
-    {
+    if (sendData(&transferSocket, buffer, BUFFER_LENGTH) == -1) {
         systemFatal("Send Failed");
     }
     
