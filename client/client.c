@@ -113,7 +113,6 @@ void processCommand(int* controlSocket)
 			listFile(port);
 			break;
 		case 'r': // receive file
-			cmd[0] = '0';
 			printf("Enter Filename: ");
 			scanf("%s", cmd + 1);
 			// Send Command and file name
@@ -124,7 +123,6 @@ void processCommand(int* controlSocket)
 			receiveFile(port, cmd + 1);
 			exit(EXIT_SUCCESS);
 		case 's': // send file
-			cmd[0] = '1';
 			printf("Enter Filename: ");
 			scanf("%s", cmd + 1);
 			// Send Command and file name

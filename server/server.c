@@ -12,10 +12,9 @@
 #include "server.h"
 #include "../network/network.h"
 
-#define GET_FILE 0
-#define SEND_FILE 1
 #define REQUEST_LIST 2
 #define TRANSFER_PORT 7000
+#define DEF_DIR "./share/"
 
 void initializeServer(int *listenSocket, int *port);
 void createTransferSocket(int *socket);
@@ -47,7 +46,6 @@ void server(int port)
         }
 
         // Spawn process to deal with client
-        printf("%u", *clientPort);
         processId = fork();
         if (processId == 0)
         {
@@ -96,11 +94,11 @@ void processConnection(int socket, char *ip, int port)
     
     switch (buffer[0])
     {
-    case GET_FILE:
+    case 'r':
         // Add 1 to buffer to move past the control byte
         sendFile(transferSocket, buffer + 1);
         break;
-    case SEND_FILE:
+    case 's':
         // Add 1 to buffer to move past the control byte
         getFile(transferSocket, buffer + 1);
         break;
@@ -120,15 +118,20 @@ void getFile(int socket, char *fileName)
     int bytesRead = 0;
     off_t fileSize = 0;
     FILE *file = NULL;
+    char* fileNamePath = (char*)malloc(sizeof(char) * FILENAME_MAX);
     
+    printf("File name: %s\n", fileName);
     // Get the control packet with the file size
     readData(&socket, buffer, BUFFER_LENGTH);
+    printf("File size: %s\n", buffer);
     
     // Retrieve file size from the buffer
     bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
     
     // Open the file
-    file = fopen(fileName, "wb");
+    sprintf(fileNamePath, "%s%s", DEF_DIR, fileName);
+    printf("%s", fileNamePath);
+    file = fopen(fileNamePath, "wb");
     if (file == NULL)
     {
         systemFatal("Unable To Create File");
