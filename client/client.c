@@ -233,7 +233,7 @@ void receiveFile(int port, const char* fileName)
 	transferSocket = initalizeServer(&port);
 	
 	readData(&transferSocket, buffer, BUFFER_LENGTH);
-	bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
+	memmove((void*)&fileSize, buffer, sizeof(off_t));
 	
 	sprintf(fileNamePath, "%s%s", DEF_DIR, fileName);
     printf("%s", fileNamePath);
