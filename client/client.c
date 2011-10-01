@@ -12,11 +12,12 @@
 #include <strings.h>
 #include <time.h>
 #include <string.h>
+#include <math.h>
 
 #define USAGE		"Usage: %s -i [ip address]\n"
 #define RECEIVE		0
 #define SEND		1
-#define DEF_DIR "./share/"
+#define DEF_DIR 	"./share/"
 
 int main(int argc, char** argv)
 {
@@ -42,8 +43,7 @@ int main(int argc, char** argv)
             exit(EXIT_FAILURE);
         }
     }
-
-	printf("Connecting to control Server: %s\n", ipAddr);
+    
 	controlSocket = initConnection(DEF_PORT, ipAddr);
 	processCommand(&controlSocket);
 
@@ -82,9 +82,9 @@ int main(int argc, char** argv)
 --
 -- Commands:
 -- e - exit the program
--- l - list the available files on the server
--- 0 - receive a file from the server
--- 1 - send a file to the server
+-- r - receive a file from the server
+-- s - send a file to the server
+-- f - show local files
 -- h - show a list of available commands
 */
 void processCommand(int* controlSocket)
@@ -92,28 +92,18 @@ void processCommand(int* controlSocket)
 	char* cmd = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 	int port = getPort(controlSocket);
 	
-	printf("Port: %d", port); 
-	
 	// Print help
 	printHelp();
 	
 	while(TRUE) {
+		fflush(stdin);
 		printf("$ ");
-		if(scanf("%c", &(cmd[0])) == EOF) { 
-			cmd[0] = 'e';
-		}
+		cmd[0] = getc(stdin);
 		
 		switch(cmd[0]) {
 		case 'e': // exit
 			closeSocket(controlSocket);
 			exit(EXIT_SUCCESS);
-		case 'l': // list files
-			if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
-				systemFatal("Error sending list command");
-			}
-			closeSocket(controlSocket);
-			listFile(port);
-			break;
 		case 'r': // receive file
 			cmd[0] = (char)0;
 			printf("Enter Filename: ");
@@ -150,51 +140,6 @@ void processCommand(int* controlSocket)
 }
 
 /*
--- FUNCTION: listFile
---
--- DATE: September 23, 2011
---
--- REVISIONS:
---
--- DESIGNER: Karl Castillo
---
--- PROGRAMMER: Karl Castillo
---
--- INTERFACE: void listFile(int* socket)
---				socket - the current socket the client is connected as
---
--- RETURNS: void
---
--- NOTES:
--- This function sends the list command and waits for the reply of the transfer
--- server. The transfer server will reply with the list of files available in
--- the transfer directory on the server.
--- 
--- Once the reply is received, it will be printed in order of receiving.
-*/
-void listFile(int port)
-{	
-	char files[BUFFER_LENGTH];
-	int dataRead;
-	int transferSocket = 0;
-	
-	//initalizeServer(&transferSocket, &port);
-	
-	system("clear");
-	
-	while(TRUE) {
-		// Receive File List
-		dataRead = readData(&transferSocket, files, FILENAME_MAX);
-		if(dataRead <= 0) {
-			break;
-		}
-		// Print File List
-		printf("%s", files);
-	}
-}
-
-
-/*
 -- FUNCTION: receiveFile
 --
 -- DATE: September 23, 2011
@@ -205,7 +150,7 @@ void listFile(int port)
 --
 -- PROGRAMMER: Karl Castillo
 --
--- INTERFACE: void receiveFile(int* socket, const char* fileName)
+-- INTERFACE: void receiveFile(int port, const char* fileName)
 --				socket - the current socket the client is connected as
 --				fileName - the name of the file to be received/downloaded
 --
@@ -230,33 +175,52 @@ void receiveFile(int port, const char* fileName)
 	int transferSocket = 0;
 	char* fileNamePath = (char*)malloc(sizeof(char) * FILENAME_MAX);
 	
-	transferSocket = initalizeServer(&port);
+	initalizeServer(&port, &transferSocket);
 	
+	// Get Size of file
 	readData(&transferSocket, buffer, BUFFER_LENGTH);
 	memmove((void*)&fileSize, buffer, sizeof(off_t));
+	printf("Size of File: %d\n", (int)fileSize);
 	
+	// Create file path
 	sprintf(fileNamePath, "%s%s", DEF_DIR, fileName);
-    printf("%s", fileNamePath);
+    printf("Save Path: %s\n", fileNamePath);
 	
+	// Opening file for writing
 	if((file = fopen(fileNamePath, "wb")) == NULL) {
 		fprintf(stderr, "Error opening file: %s\n", fileName);
 		return;
 	}
 	
+	// Hide Cursor
+	fprintf(stderr, "\033[?25l");
+	
+	// Start Reading from socket
 	while (count < (fileSize - BUFFER_LENGTH)) {
         bytesRead = readData(&transferSocket, buffer, BUFFER_LENGTH);
         fwrite(buffer, sizeof(char), bytesRead, file);
         count += bytesRead;
+        printProgressBar(fileSize, count);
     }
 	
 	bytesRead = readData(&transferSocket, buffer, fileSize - count);
+	printProgressBar(fileSize, count + bytesRead);
     fwrite(buffer, sizeof(char), bytesRead, file);
+	// End Reading from socket
 	
+	// Show Cursor
+	fprintf(stderr, "\033[?25h\n");
+	
+	// Close file
 	fclose(file);
 	
 	chmod(fileName, 00400 | 00200 | 00100);
     
+    // Free memory allocated for buffer
     free(buffer);
+    
+    // Print Success message
+    printf("Transfer Complete!\n");
 }
 
 
@@ -271,7 +235,7 @@ void receiveFile(int port, const char* fileName)
 --
 -- PROGRAMMER: Karl Castillo
 --
--- INTERFACE: void sendFile(int* socket, const char* fileName)
+-- INTERFACE: void sendFile(int port, const char* fileName)
 --				socket - the current socket the client is connected as
 --				fileName - the name of the file to be received/downloaded
 --
@@ -293,18 +257,21 @@ void sendFile(int port, const char* fileName)
 	int file = 0;
     int transferSocket = 0;
 	
-	transferSocket = initalizeServer(&port);
+	initalizeServer(&port, &transferSocket);
 	
 	if ((file = open(fileName, O_RDONLY)) == -1) {
         systemFatal("Unable To Open File");
 	}
 	
+	// Get size of file
 	if (fstat(file, &statBuffer) == -1) {
         systemFatal("Error Getting File Information");
     }
     memmove(buffer, (void*)&statBuffer.st_size, sizeof(off_t));
     
     printf("Connected to server and sending %s\n", fileName);
+    
+    // Send file size
     if (sendData(&transferSocket, buffer, BUFFER_LENGTH) == -1) {
         systemFatal("Send Failed");
     }
@@ -319,12 +286,30 @@ void sendFile(int port, const char* fileName)
     free(buffer);
 }
 
+/*
+-- FUNCTION: initConnection
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS:
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: int initConnection(int port, const char* ip) 
+--				port - the port the client will connect to to the server
+--				ip - ip address of the server
+--
+-- RETURNS: int - the new socket created
+--
+-- NOTES:
+-- This function will create the socket, set reuse and connect to the server.
+*/
 int initConnection(int port, const char* ip) 
 {
 	int socket;
-	
-	printf("Port: %d\n", port);
-	
+
 	// Creating Socket
 	if((socket = tcpSocket()) == -1) {
 		systemFatal("Error Creating Socket");
@@ -343,22 +328,60 @@ int initConnection(int port, const char* ip)
 	return socket;
 }
 
+/*
+-- FUNCTION: printHelp
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS:
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: void printHelp()
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- Prints ouf the list of commands available.
+*/
 void printHelp()
 {
 	system("clear");
 	printf("Super File Transfer\n");
-	printf("l - list transferable files\n");
 	printf("r - receive file\n");
 	printf("s - send file\n");
-	printf("f - print local files\n");
+	printf("f - list local files\n");
 	printf("h - help\n");
 	printf("e - exit\n");
 }
 
-int initalizeServer(int *port)
+/*
+-- FUNCTION: initializeServer
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS:
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: void initalizeServer(int* port, int* socket)
+--				port - the port the client will listen on
+--				socket - the socket that will hold the new socket
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function will create the socket, set reuse and listen for any incoming
+-- connections from the server.
+*/
+void initalizeServer(int* port, int* socket)
 {
     int sock = 0;
-    int socket = 0;
+
     // Create a TCP socket
     if ((sock = tcpSocket()) == -1) {
         systemFatal("Cannot Create Socket!");
@@ -379,13 +402,31 @@ int initalizeServer(int *port)
         systemFatal("Cannot Listen On Socket");
     }
     
-    if((socket = acceptConnection(&sock)) == -1) {
+    if((*socket = acceptConnection(&sock)) == -1) {
     	systemFatal("Cannot Accept on Socket");
     }
     close(sock);
-    return socket;
 }
 
+/*
+-- FUNCTION: getPort
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS:
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: int getPort(int* socket)
+--				socket - the socket where the port will be determined.
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function will get the port that the socket is bound to.
+*/
 int getPort(int* socket)
 {
 	struct sockaddr_in sin;
@@ -396,6 +437,39 @@ int getPort(int* socket)
 	return ntohs(sin.sin_port);
 }
 
+/*
+-- FUNCTION: printProgressBar
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS:
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: void printProgressBar(int fileSize, int tBytesRead)
+--				fileSize - the total size of the file.
+--				tBytesRead - the number of bytes currently read
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function will produce a progress bar-like animation.
+*/
+void printProgressBar(int fileSize, int tBytesRead) 
+{
+	char t = '=';
+	int perc = ((double)tBytesRead / fileSize) * 100;
+	int step = perc/2;
+	int i;
+	
+	fprintf(stderr, "%d%c[", perc, '%');
+	for(i = 0; i < step; i++) {
+		fprintf(stderr, "%c", t);
+	}
+	fprintf(stderr, ">\r");
+}
 
 /*
 -- FUNCTION: systemFatal

@@ -10,15 +10,15 @@
 extern "C" {
 #endif
 void processCommand(int* controlSocket);
-void listFile(int port);
 void receiveFile(int port, const char* fileName);
 void sendFile(int port, const char* fileName);
 
 // Helper functions
 int initConnection(int port, const char* ip);
-int initalizeServer(int *port);
-void printHelp();
+void initalizeServer(int* port, int* socket);
+void printHelp(); 
 int getPort(int* socket);
+void printProgressBar(int fileSize, int tBytesRead);
 static void systemFatal(const char* message);
 #ifdef __cplusplus
 }
