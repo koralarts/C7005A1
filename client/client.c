@@ -1,4 +1,32 @@
-#include "client.h"
+/*
+-- SOURCE FILE: client.c
+--
+-- PROGRAM: Super File Transfer
+--
+-- FUNCTIONS:
+-- void processCommand(int* controlSocket);
+-- void receiveFile(int port, const char* fileName);
+-- void sendFile(int port, const char* fileName);
+-- int initConnection(int port, const char* ip);
+-- void initalizeServer(int* port, int* socket);
+-- void printHelp(); 
+-- int getPort(int* socket);
+-- void printProgressBar(int fileSize, int tBytesRead);
+-- static void systemFatal(const char* message);
+--
+-- DATE: March 12, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- NOTES:
+-- This file contains the necessary functions that will connect to the server
+-- and process the different commands that the user specifies.
+*/
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -12,13 +40,33 @@
 #include <strings.h>
 #include <time.h>
 #include <string.h>
-#include <math.h>
+
+#include "client.h"
 
 #define USAGE		"Usage: %s -i [ip address]\n"
-#define RECEIVE		0
-#define SEND		1
 #define DEF_DIR 	"./share/"
 
+/*
+-- FUNCTION: main
+--
+-- DATE: September 23, 2011
+--
+-- REVISIONS:
+--
+-- DESIGNER: Karl Castillo
+--
+-- PROGRAMMER: Karl Castillo
+--
+-- INTERFACE: int main(int argc, char** argv)
+--				argc - number of arguments
+--				argv - the arguments
+--
+-- RETURNS: int - 0
+--
+-- NOTES:
+-- This is the main function where the arguments are parsed and proper 
+-- preparations are done. These preparations include initializing sockets.
+*/
 int main(int argc, char** argv)
 {
 	char* ipAddr = 0;
@@ -89,15 +137,15 @@ int main(int argc, char** argv)
 */
 void processCommand(int* controlSocket)
 {
+	FILE* temp = NULL;
 	char* cmd = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
 	int port = getPort(controlSocket);
 	
 	// Print help
 	printHelp();
+	printf("$ ");
 	
-	while(TRUE) {
-		fflush(stdin);
-		printf("$ ");
+	while(TRUE) {		
 		cmd[0] = getc(stdin);
 		
 		switch(cmd[0]) {
@@ -123,17 +171,22 @@ void processCommand(int* controlSocket)
 			if(sendData(controlSocket, cmd, BUFFER_LENGTH) == -1) {
 				systemFatal("Error sending send command.");
 			}
+			if((temp = fopen(cmd + 1, "r"))== NULL) {
+				fprintf(stderr, "%s does not exist\n", cmd + 1);
+				continue;
+			}
+			fclose(temp);
 			closeSocket(controlSocket);
 			sendFile(port, cmd + 1);
 			exit(EXIT_SUCCESS);
 		case 'h': // show commands
 			printHelp();
+			printf("$ ");
 			break;
 		case 'f':
 			system("ls");
+			printf("$ ");
 			break;
-		default:
-			printf("Invalid Command. Type h for a list of commands.\n");
 		}
 	}
 	
@@ -284,6 +337,9 @@ void sendFile(int port, const char* fileName)
     // Close the file
     close(file);
     free(buffer);
+    
+    // Print Success message
+    printf("Transfer Complete!\n");
 }
 
 /*
