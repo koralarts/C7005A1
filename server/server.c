@@ -4,7 +4,7 @@
 -- PROGRAM: Super File Transfer
 --
 -- FUNCTIONS:
--- void server (int port, int maxClients);
+-- void server (int port);
 -- void initializeServer(int *listenSocket, int *port);
 -- void createTransferSocket(int *socket);
 -- void processConnection(int socket, char *ip, int port);
@@ -21,7 +21,12 @@
 -- PROGRAMMER: Luke Queenan
 --
 -- NOTES:
--- This file contains the server functionality of the program.
+-- This file contains the server functionality of the program. The server sits
+-- in the function server and listens on the supplied port. When a connection is
+-- requested, the server will accept and then fork a new process to handle the
+-- client connection. The server then continues to listen. The child process
+-- reads the control packet and then calls the corresponding function, getFile
+-- or sendFile.
 */
 
 #include <stdio.h>
