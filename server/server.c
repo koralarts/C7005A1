@@ -1,3 +1,29 @@
+/*
+-- SOURCE FILE: server.c
+--
+-- PROGRAM: Super File Transfer
+--
+-- FUNCTIONS:
+-- void server (int port, int maxClients);
+-- void initializeServer(int *listenSocket, int *port);
+-- void createTransferSocket(int *socket);
+-- void processConnection(int socket, char *ip, int port);
+-- void getFile(int socket, char *fileName);
+-- void sendFile(int socket, char *fileName);
+-- static void systemFatal(const char* message);
+--
+-- DATE: Ocotober 2, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- NOTES:
+-- This file contains the server functionality of the program.
+*/
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -76,6 +102,26 @@ void server(int port)
     printf("Server Closing!\n");
 }
 
+/*
+-- FUNCTION: processConnection
+--
+-- DATE: September 25, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- INTERFACE: void processConnection(int socket, char *ip, int port);
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function is called after a client has connected to the server. The
+-- function will determine the type of connection (getting a file or retrieving
+-- a file) and call the appropriate function.
+*/
 void processConnection(int socket, char *ip, int port)
 {
     int transferSocket = 0;
@@ -119,6 +165,24 @@ void processConnection(int socket, char *ip, int port)
     close(transferSocket);
 }
 
+/*
+-- FUNCTION: getFile
+--
+-- DATE: September 25, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- INTERFACE: void getFile(int socket, char *fileName);
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function is used to retrieve a file from a client.
+*/
 void getFile(int socket, char *fileName)
 {
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
@@ -166,6 +230,25 @@ void getFile(int socket, char *fileName)
     free(buffer);
 }
 
+/*
+-- FUNCTION: sendFile
+--
+-- DATE: September 25, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- INTERFACE: void sendFile(int socket, char *fileName);
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function is used to send a file to a client. The function will open a
+-- file and use the function sendFile to transmit the file to the client.
+*/
 void sendFile(int socket, char *fileName)
 {
     int file = 0;
@@ -200,21 +283,24 @@ void sendFile(int socket, char *fileName)
 }
 
 /*
-void getFileList(char *buffer)
-{
-    int index = 0;
-    DIR *mydir = opendir(".");
-    struct dirent *entry = NULL;
-    
-    while ((entry = readdir(mydir)))
-    {
-        break;
-    }
-    
-    closedir(mydir);
-}
+-- FUNCTION: createTransferSocket
+--
+-- DATE: September 29, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- INTERFACE: void createTransferSocket(int *socket);
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function creates a transfer socket for the server to communicate with
+-- the client. The socket is bound to port 7000.
 */
-
 void createTransferSocket(int *socket)
 {
     int *defaultPort = (int*)malloc(sizeof(int));
