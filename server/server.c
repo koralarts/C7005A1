@@ -1,3 +1,29 @@
+/*
+-- SOURCE FILE: server.c
+--
+-- PROGRAM: Super File Transfer
+--
+-- FUNCTIONS:
+-- void server (int port, int maxClients);
+-- void initializeServer(int *listenSocket, int *port);
+-- void createTransferSocket(int *socket);
+-- void processConnection(int socket, char *ip, int port);
+-- void getFile(int socket, char *fileName);
+-- void sendFile(int socket, char *fileName);
+-- static void systemFatal(const char* message);
+--
+-- DATE: Ocotober 2, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- NOTES:
+-- This file contains the server functionality of the program.
+*/
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -8,18 +34,20 @@
 #include <errno.h>
 #include <dirent.h>
 #include <strings.h>
+#include <string.h>
 
 #include "server.h"
 #include "../network/network.h"
 
-#define BUFFER_LENGTH 257
 #define GET_FILE 0
 #define SEND_FILE 1
 #define REQUEST_LIST 2
-#define FILE_SIZE 3
+#define TRANSFER_PORT 7000
+#define DEF_DIR "./share/"
 
 void initializeServer(int *listenSocket, int *port);
-void processConnection(int socket);
+void createTransferSocket(int *socket);
+void processConnection(int socket, char *ip, int port);
 void getFile(int socket, char *fileName);
 void sendFile(int socket, char *fileName);
 static void systemFatal(const char* message);
@@ -29,6 +57,8 @@ void server(int port)
     int listenSocket = 0;
     int socket = 0;
     int processId = 0;
+    char clientIp[16];
+    unsigned short *clientPort = NULL;
     
     // Set up the server
     initializeServer(&listenSocket, &port);
@@ -36,24 +66,30 @@ void server(int port)
     // Loop to monitor the server socket
     while (1)
     {
+        clientPort = (unsigned short*)malloc(sizeof(unsigned short));
         // Block here and wait for new connections
-        if ((socket = acceptConnection(&listenSocket)) == -1)
+        if ((socket = acceptConnectionIpPort(&listenSocket, clientIp,
+            clientPort)) == -1)
         {
             systemFatal("Can't Accept Client");
         }
-        printf("New Client!");
+
         // Spawn process to deal with client
+        processId = fork();
         if (processId == 0)
         {
+            close(listenSocket);
             // Process the child connection
-            processConnection(socket);
+            processConnection(socket, clientIp, (int)*clientPort);
             // Once we are done, exit
-            close(socket);
+            free(clientPort);
             return;
         }
         else if (processId > 0)
         {
             // Since I am the parent, keep on going
+            close(socket);
+            free(clientPort);
             continue;
         }
         else
@@ -66,31 +102,87 @@ void server(int port)
     printf("Server Closing!\n");
 }
 
-void processConnection(int socket)
+/*
+-- FUNCTION: processConnection
+--
+-- DATE: September 25, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- INTERFACE: void processConnection(int socket, char *ip, int port);
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function is called after a client has connected to the server. The
+-- function will determine the type of connection (getting a file or retrieving
+-- a file) and call the appropriate function.
+*/
+void processConnection(int socket, char *ip, int port)
 {
+    int transferSocket = 0;
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
-    
-    // Read data from the client
-    while (1)
-    {
-        readData(&socket, buffer, BUFFER_LENGTH);
 
-        switch (buffer[0])
-        {
-        case GET_FILE:
-            // Add 1 to buffer to move past the control byte
-            getFile(socket, buffer + 1);
-            break;
-        case SEND_FILE:
-            // Add 1 to buffer to move past the control byte
-            sendFile(socket, buffer + 1);
-            break;
-        case REQUEST_LIST:
-            break;
-        }
+    // Read data from the client
+    readData(&socket, buffer, BUFFER_LENGTH);
+    printf("Filename is %s and the command is %d\n", buffer + 1, buffer[0]);
+    // Close the command socket
+    close(socket);
+    
+    // Connect to the client
+    createTransferSocket(&transferSocket);
+    if (connectToServer(&port, &transferSocket, ip) == -1)
+    {
+        systemFatal("Unable To Connect To Client");
     }
+    
+    printf("Connected to Client: %s\n", ip);
+    
+    switch ((int)buffer[0])
+    {
+    case GET_FILE:
+        // Add 1 to buffer to move past the control byte
+        printf("Sending %s to client now...\n", buffer + 1);
+        sendFile(transferSocket, buffer + 1);
+        break;
+    case SEND_FILE:
+        // Add 1 to buffer to move past the control byte
+        printf("Getting %s from client now...\n", buffer + 1);
+        getFile(transferSocket, buffer + 1);
+        printf("Getting %s successful.\n", buffer + 1);
+        break;
+    case REQUEST_LIST:
+        break;
+    }
+    
+    // Free local variables and sockets
+    printf("Closing client connection\n");
+    free(buffer);
+    close(transferSocket);
 }
 
+/*
+-- FUNCTION: getFile
+--
+-- DATE: September 25, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- INTERFACE: void getFile(int socket, char *fileName);
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function is used to retrieve a file from a client.
+*/
 void getFile(int socket, char *fileName)
 {
     char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
@@ -98,30 +190,35 @@ void getFile(int socket, char *fileName)
     int bytesRead = 0;
     off_t fileSize = 0;
     FILE *file = NULL;
+    char* fileNamePath = (char*)malloc(sizeof(char) * FILENAME_MAX);
     
     // Get the control packet with the file size
     readData(&socket, buffer, BUFFER_LENGTH);
     
     // Retrieve file size from the buffer
-    bcopy(buffer + 1, (void*)fileSize, sizeof(off_t));
+    memmove((void*)&fileSize, buffer, sizeof(off_t));
+    printf("File size is %zd\n", fileSize);
     
     // Open the file
-    file = fopen(fileName, "wb");
+    sprintf(fileNamePath, "%s%s", DEF_DIR, fileName);
+    file = fopen(fileNamePath, "wb");
     if (file == NULL)
     {
         systemFatal("Unable To Create File");
     }
-    
+
     // Read from the socket and write the file to disk
     while (count < (fileSize - BUFFER_LENGTH))
     {
         bytesRead = readData(&socket, buffer, BUFFER_LENGTH);
+        printf("Got %d bytes...\n", bytesRead);
         fwrite(buffer, sizeof(char), bytesRead, file);
         count += bytesRead;
     }
     
     // Retrieve any left over data and write it out
     bytesRead = readData(&socket, buffer, fileSize - count);
+    printf("Got %d bytes...\n", bytesRead);
     fwrite(buffer, sizeof(char), bytesRead, file);
 
     // Close the file
@@ -133,12 +230,29 @@ void getFile(int socket, char *fileName)
     free(buffer);
 }
 
+/*
+-- FUNCTION: sendFile
+--
+-- DATE: September 25, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- INTERFACE: void sendFile(int socket, char *fileName);
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function is used to send a file to a client. The function will open a
+-- file and use the function sendFile to transmit the file to the client.
+*/
 void sendFile(int socket, char *fileName)
 {
     int file = 0;
     struct stat statBuffer;
-    off_t offset = 0;
-    //char *buffer = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
     char *buffer = (char*)calloc(BUFFER_LENGTH, sizeof(char));
     
     // Open the file for reading
@@ -154,12 +268,11 @@ void sendFile(int socket, char *fileName)
     }
     
     // Send a control message with the size of the file
-    *buffer = FILE_SIZE;
-    bcopy((void*)statBuffer.st_size, buffer + 1, sizeof(off_t));
+    memmove(buffer, (void*)&statBuffer.st_size, sizeof(off_t));
     sendData(&socket, buffer, BUFFER_LENGTH);
     
     // Send the file to the client
-    if (sendfile(socket, file, &offset, statBuffer.st_size) == -1)
+    if (sendfile(socket, file, NULL, statBuffer.st_size) == -1)
     {
         systemFatal("Unable To Send File");
     }
@@ -170,20 +283,49 @@ void sendFile(int socket, char *fileName)
 }
 
 /*
-void getFileList(char *buffer)
+-- FUNCTION: createTransferSocket
+--
+-- DATE: September 29, 2011
+--
+-- REVISIONS: (Date and Description)
+--
+-- DESIGNER: Luke Queenan
+--
+-- PROGRAMMER: Luke Queenan
+--
+-- INTERFACE: void createTransferSocket(int *socket);
+--
+-- RETURNS: void
+--
+-- NOTES:
+-- This function creates a transfer socket for the server to communicate with
+-- the client. The socket is bound to port 7000.
+*/
+void createTransferSocket(int *socket)
 {
-    int index = 0;
-    DIR *mydir = opendir("/");
-    struct dirent *entry = NULL;
+    int *defaultPort = (int*)malloc(sizeof(int));
+    *defaultPort = TRANSFER_PORT;
     
-    while ((entry = readdir(mydir)))
+    // Create a TCP socket
+    if ((*socket = tcpSocket()) == -1)
     {
-        break;
+        systemFatal("Cannot Create Socket!");
     }
     
-    closedir(mydir);
+    // Allow the socket to be reused immediately after exit
+    if (setReuse(socket) == -1)
+    {
+        systemFatal("Cannot Set Socket To Reuse");
+    }
+    
+    // Bind an address to the socket
+    if (bindAddress(defaultPort, socket) == -1)
+    {
+        systemFatal("Cannot Bind Address To Socket");
+    }
+    
+    free(defaultPort);
 }
-*/
 
 /*
 -- FUNCTION: initializeServer
