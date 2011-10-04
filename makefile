@@ -9,7 +9,7 @@ NDIR = ./network
 ODIR = ./object
 BDIR = ./bin
 DDIR = ./debug
-
+HDIR = ./share
 
 # Release
 release: client server
@@ -35,11 +35,11 @@ server-d: network.o server.o main.o
 
 # mkDir
 dir:
-	mkdir -p $(BDIR) && mkdir -p $(ODIR) && mkdir -p $(DDIR)
+	mkdir -p $(BDIR) && mkdir -p $(ODIR) && mkdir -p $(DDIR) && mkdir -p $(HDIR)
 
 # Clean
 clean:
-	rm -f $(BDIR)/* $(ODIR)/* $(DDIR)/*
+	rm -f $(BDIR)/* $(ODIR)/* $(DDIR)/* $(HDIR)/*
 
 # Object
 network.o: dir
