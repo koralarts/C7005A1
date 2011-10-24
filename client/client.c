@@ -139,7 +139,7 @@ void processCommand(int* controlSocket)
 {
 	FILE* temp = NULL;
 	char* cmd = (char*)malloc(sizeof(char) * BUFFER_LENGTH);
-	int port = getPort(controlSocket);
+	int port = 7009;//getPort(controlSocket);
 	
 	// Print help
 	printHelp();
@@ -380,7 +380,7 @@ int initConnection(int port, const char* ip)
 	if(connectToServer(&port, &socket, ip) == -1) {
 		systemFatal("Cannot Connect to server");
 	}
-	
+
 	return socket;
 }
 
